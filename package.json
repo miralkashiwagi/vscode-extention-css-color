@@ -6,15 +6,124 @@
     "Programming Languages",
     "Other"
   ],
-  "description": "",
+  "description": "Display color chips for CSS custom properties and SCSS variables",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.99.0"
   },
   "activationEvents": [
-    "onStartupFinished"
+    "onLanguage:css",
+    "onLanguage:scss",
+    "onLanguage:sass",
+    "onLanguage:less"
   ],
   "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "CSS Variable Color Chips",
+      "properties": {
+        "cssVariableColorChips.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable the CSS Variable Color Chips extension"
+        },
+        "cssVariableColorChips.displayMode": {
+          "type": "string",
+          "enum": ["default", "computed", "multiple"],
+          "default": "default",
+          "description": "How to display colors for dynamic variables",
+          "enumDescriptions": [
+            "Show default values defined in CSS",
+            "Show computed values from current theme",
+            "Show multiple possible values"
+          ]
+        },
+        "cssVariableColorChips.enabledFileTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["css", "scss", "sass", "less"],
+          "description": "File types where color chips should be displayed"
+        },
+        "cssVariableColorChips.variableResolutionScope": {
+          "type": "string",
+          "enum": ["file", "workspace"],
+          "default": "workspace",
+          "description": "Scope for resolving variable definitions",
+          "enumDescriptions": [
+            "Resolve variables only within the current file",
+            "Resolve variables across the entire workspace"
+          ]
+        },
+        "cssVariableColorChips.chipSize": {
+          "type": "string",
+          "enum": ["small", "medium", "large"],
+          "default": "medium",
+          "description": "Size of color chips",
+          "enumDescriptions": [
+            "Small chips (8x8px)",
+            "Medium chips (12x12px)",
+            "Large chips (16x16px)"
+          ]
+        },
+        "cssVariableColorChips.showVariableDefinitions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show color chips for variable definitions"
+        },
+        "cssVariableColorChips.showVariableUsages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show color chips for variable usages"
+        },
+        "cssVariableColorChips.showDirectColors": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show color chips for direct color values"
+        },
+        "cssVariableColorChips.maxColorsInMultipleMode": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of colors to show in multiple color mode"
+        },
+        "cssVariableColorChips.enableHoverInfo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hover information for color chips"
+        },
+        "cssVariableColorChips.enableDebugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging for troubleshooting"
+        },
+        "cssVariableColorChips.cacheSizeLimit": {
+          "type": "number",
+          "default": 100,
+          "minimum": 10,
+          "maximum": 1000,
+          "description": "Maximum number of documents to cache"
+        },
+        "cssVariableColorChips.debounceDelay": {
+          "type": "number",
+          "default": 300,
+          "minimum": 50,
+          "maximum": 2000,
+          "description": "Delay in milliseconds for real-time updates"
+        },
+        "cssVariableColorChips.customThemePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Custom paths to theme files for computed mode"
+        }
+      }
+    }
+  },
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",

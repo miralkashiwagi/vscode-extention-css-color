@@ -1,0 +1,645 @@
+import * as vscode from 'vscode';
+import { DecorationProvider } from './interfaces';
+import { ColorValue, ChipSize } from './types';
+
+export class DecorationProviderImpl implements DecorationProvider {
+  private decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
+  private activeDecorations: Map<string, vscode.TextEditorDecorationType[]> = new Map();
+
+  /**
+   * Create a color chip decoration for a given color and range
+   */
+  createColorChip(color: ColorValue, range: vscode.Range): vscode.DecorationOptions {
+    const chipSize = this.getChipSize();
+    const chipStyle = this.createChipStyle(color, chipSize);
+    
+    return {
+      range,
+      renderOptions: {
+        before: {
+          contentText: '',
+          backgroundColor: color.hex,
+          border: this.getBorderStyle(color),
+          width: chipStyle.width,
+          height: chipStyle.height,
+          margin: chipStyle.margin,
+          textDecoration: 'none; display: inline-block; vertical-align: middle;'
+        }
+      },
+      hoverMessage: this.createHoverMessage(color)
+    };
+  }
+
+  /**
+   * Apply decorations to a text editor
+   */
+  applyDecorations(editor: vscode.TextEditor, decorations: vscode.DecorationOptions[]): void {
+    if (!editor || decorations.length === 0) {
+      return;
+    }
+
+    const editorId = editor.document.uri.toString();
+    
+    // Clear existing decorations for this editor
+    this.clearDecorations(editor);
+
+    // Resolve overlapping decorations
+    const resolvedDecorations = this.resolveOverlappingDecorations(decorations);
+
+    // Group decorations by color to optimize decoration types
+    const decorationGroups = this.groupDecorationsByColor(resolvedDecorations);
+    const newDecorationTypes: vscode.TextEditorDecorationType[] = [];
+
+    decorationGroups.forEach((decorationOptions, colorKey) => {
+      const decorationType = this.getOrCreateDecorationType(colorKey, decorationOptions[0]);
+      newDecorationTypes.push(decorationType);
+      
+      // Apply decorations of this color
+      editor.setDecorations(decorationType, decorationOptions);
+    });
+
+    // Store active decorations for cleanup
+    this.activeDecorations.set(editorId, newDecorationTypes);
+  }
+
+  /**
+   * Clear all decorations from a text editor
+   */
+  clearDecorations(editor: vscode.TextEditor): void {
+    const editorId = editor.document.uri.toString();
+    const activeTypes = this.activeDecorations.get(editorId);
+
+    if (activeTypes) {
+      activeTypes.forEach(decorationType => {
+        editor.setDecorations(decorationType, []);
+      });
+      this.activeDecorations.delete(editorId);
+    }
+  }
+
+  /**
+   * Dispose all decoration types and clear resources
+   */
+  dispose(): void {
+    // Clear all active decorations
+    this.activeDecorations.clear();
+
+    // Dispose all decoration types
+    this.decorationTypes.forEach(decorationType => {
+      decorationType.dispose();
+    });
+    this.decorationTypes.clear();
+  }
+
+  /**
+   * Update decorations when settings change
+   */
+  updateDecorationStyles(): void {
+    // Dispose existing decoration types to force recreation with new styles
+    this.decorationTypes.forEach(decorationType => {
+      decorationType.dispose();
+    });
+    this.decorationTypes.clear();
+
+    // Active decorations will be recreated on next apply
+  }
+
+  // Private helper methods
+
+  /**
+   * Get chip size from settings
+   */
+  private getChipSize(): ChipSize {
+    const config = vscode.workspace.getConfiguration('cssVariableColorChips');
+    return config.get<ChipSize>('chipSize', 'medium');
+  }
+
+  /**
+   * Create chip style based on size
+   */
+  private createChipStyle(color: ColorValue, size: ChipSize): {
+    width: string;
+    height: string;
+    margin: string;
+  } {
+    const styles = {
+      small: { width: '8px', height: '8px', margin: '0 2px 0 0' },
+      medium: { width: '12px', height: '12px', margin: '0 4px 0 0' },
+      large: { width: '16px', height: '16px', margin: '0 6px 0 0' }
+    };
+
+    return styles[size] || styles.medium;
+  }
+
+  /**
+   * Get border style for color chip
+   */
+  private getBorderStyle(color: ColorValue): string {
+    // Add border for very light colors to improve visibility
+    const isLightColor = this.isLightColor(color);
+    return isLightColor ? '1px solid rgba(0, 0, 0, 0.2)' : 'none';
+  }
+
+  /**
+   * Check if a color is light (for border determination)
+   */
+  private isLightColor(color: ColorValue): boolean {
+    // Calculate relative luminance
+    const r = color.rgb.r / 255;
+    const g = color.rgb.g / 255;
+    const b = color.rgb.b / 255;
+
+    // Apply gamma correction
+    const rLinear = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+    const gLinear = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+    const bLinear = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+    // Calculate luminance
+    const luminance = 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+    
+    return luminance > 0.7; // Threshold for "light" color
+  }
+
+  /**
+   * Create hover message for color chip
+   */
+  private createHoverMessage(color: ColorValue): vscode.MarkdownString {
+    const markdown = new vscode.MarkdownString();
+    markdown.isTrusted = true;
+
+    // Color preview
+    const colorPreview = `<div style="width: 50px; height: 20px; background-color: ${color.hex}; border: 1px solid #ccc; display: inline-block; margin-right: 10px;"></div>`;
+    
+    // Color information
+    const colorInfo = [
+      `**Original:** \`${color.original}\``,
+      `**Hex:** \`${color.hex}\``,
+      `**RGB:** \`rgb(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b}${color.rgb.a !== undefined ? `, ${color.rgb.a}` : ''})\``,
+      `**HSL:** \`hsl(${color.hsl.h}, ${color.hsl.s}%, ${color.hsl.l}%${color.hsl.a !== undefined ? `, ${color.hsl.a}` : ''})\``
+    ].join('\n\n');
+
+    markdown.appendMarkdown(`${colorPreview}\n\n${colorInfo}`);
+    
+    return markdown;
+  }
+
+  /**
+   * Group decorations by color to optimize decoration types
+   */
+  private groupDecorationsByColor(decorations: vscode.DecorationOptions[]): Map<string, vscode.DecorationOptions[]> {
+    const groups = new Map<string, vscode.DecorationOptions[]>();
+
+    decorations.forEach(decoration => {
+      // Extract color from decoration
+      const backgroundColor = decoration.renderOptions?.before?.backgroundColor;
+      if (backgroundColor) {
+        const colorKey = backgroundColor.toString();
+        if (!groups.has(colorKey)) {
+          groups.set(colorKey, []);
+        }
+        groups.get(colorKey)!.push(decoration);
+      }
+    });
+
+    return groups;
+  }
+
+  /**
+   * Get or create decoration type for a specific color
+   */
+  private getOrCreateDecorationType(colorKey: string, sampleDecoration: vscode.DecorationOptions): vscode.TextEditorDecorationType {
+    if (this.decorationTypes.has(colorKey)) {
+      return this.decorationTypes.get(colorKey)!;
+    }
+
+    // Create new decoration type
+    const decorationType = vscode.window.createTextEditorDecorationType({
+      before: sampleDecoration.renderOptions?.before
+    });
+
+    this.decorationTypes.set(colorKey, decorationType);
+    return decorationType;
+  }
+
+  /**
+   * Create decoration for variable usage with resolved color
+   */
+  createVariableColorChip(
+    variableName: string,
+    resolvedColor: ColorValue,
+    range: vscode.Range,
+    fallbackColor?: ColorValue
+  ): vscode.DecorationOptions {
+    const chipSize = this.getChipSize();
+    const chipStyle = this.createChipStyle(resolvedColor, chipSize);
+    
+    // Create compound decoration for variable with fallback
+    const decoration: vscode.DecorationOptions = {
+      range,
+      renderOptions: {
+        before: {
+          contentText: '',
+          backgroundColor: resolvedColor.hex,
+          border: this.getBorderStyle(resolvedColor),
+          width: chipStyle.width,
+          height: chipStyle.height,
+          margin: chipStyle.margin,
+          textDecoration: 'none; display: inline-block; vertical-align: middle;'
+        }
+      },
+      hoverMessage: this.createVariableHoverMessage(variableName, resolvedColor, fallbackColor)
+    };
+
+    return decoration;
+  }
+
+  /**
+   * Create hover message for variable color chip
+   */
+  private createVariableHoverMessage(
+    variableName: string,
+    resolvedColor: ColorValue,
+    fallbackColor?: ColorValue
+  ): vscode.MarkdownString {
+    const markdown = new vscode.MarkdownString();
+    markdown.isTrusted = true;
+
+    // Variable information
+    markdown.appendMarkdown(`**Variable:** \`${variableName}\`\n\n`);
+
+    // Resolved color preview
+    const colorPreview = `<div style="width: 50px; height: 20px; background-color: ${resolvedColor.hex}; border: 1px solid #ccc; display: inline-block; margin-right: 10px;"></div>`;
+    markdown.appendMarkdown(`${colorPreview}\n\n`);
+
+    // Color information
+    const colorInfo = [
+      `**Resolved Color:**`,
+      `- Hex: \`${resolvedColor.hex}\``,
+      `- RGB: \`rgb(${resolvedColor.rgb.r}, ${resolvedColor.rgb.g}, ${resolvedColor.rgb.b}${resolvedColor.rgb.a !== undefined ? `, ${resolvedColor.rgb.a}` : ''})\``,
+      `- HSL: \`hsl(${resolvedColor.hsl.h}, ${resolvedColor.hsl.s}%, ${resolvedColor.hsl.l}%${resolvedColor.hsl.a !== undefined ? `, ${resolvedColor.hsl.a}` : ''})\``
+    ];
+
+    if (fallbackColor) {
+      colorInfo.push('', `**Fallback Color:**`);
+      colorInfo.push(`- Hex: \`${fallbackColor.hex}\``);
+      colorInfo.push(`- RGB: \`rgb(${fallbackColor.rgb.r}, ${fallbackColor.rgb.g}, ${fallbackColor.rgb.b}${fallbackColor.rgb.a !== undefined ? `, ${fallbackColor.rgb.a}` : ''})\``);
+    }
+
+    markdown.appendMarkdown(colorInfo.join('\n'));
+    
+    return markdown;
+  }
+
+  /**
+   * Create multiple color chips for variables with multiple possible values
+   */
+  createMultipleColorChips(
+    colors: ColorValue[],
+    range: vscode.Range,
+    context?: string
+  ): vscode.DecorationOptions {
+    if (colors.length === 0) {
+      throw new Error('At least one color is required');
+    }
+
+    if (colors.length === 1) {
+      return this.createColorChip(colors[0], range);
+    }
+
+    const chipSize = this.getChipSize();
+    const chipStyle = this.createChipStyle(colors[0], chipSize);
+    
+    // Create gradient background for multiple colors
+    const gradientColors = colors.map(color => color.hex).join(', ');
+    const gradient = `linear-gradient(90deg, ${gradientColors})`;
+
+    const decoration: vscode.DecorationOptions = {
+      range,
+      renderOptions: {
+        before: {
+          contentText: '●●',
+          color: colors[0].hex,
+          border: '1px solid rgba(0, 0, 0, 0.2)',
+          width: chipStyle.width,
+          height: chipStyle.height,
+          margin: chipStyle.margin,
+          textDecoration: 'none; display: inline-block; vertical-align: middle; font-size: 6px;'
+        }
+      },
+      hoverMessage: this.createMultipleColorsHoverMessage(colors, context)
+    };
+
+    return decoration;
+  }
+
+  /**
+   * Create hover message for multiple colors
+   */
+  private createMultipleColorsHoverMessage(colors: ColorValue[], context?: string): vscode.MarkdownString {
+    const markdown = new vscode.MarkdownString();
+    markdown.isTrusted = true;
+
+    if (context) {
+      markdown.appendMarkdown(`**Context:** ${context}\n\n`);
+    }
+
+    markdown.appendMarkdown(`**Multiple Possible Colors (${colors.length}):**\n\n`);
+
+    colors.forEach((color, index) => {
+      const colorPreview = `<div style="width: 30px; height: 15px; background-color: ${color.hex}; border: 1px solid #ccc; display: inline-block; margin-right: 5px;"></div>`;
+      markdown.appendMarkdown(`${index + 1}. ${colorPreview} \`${color.hex}\` (${color.original})\n\n`);
+    });
+
+    return markdown;
+  }
+
+  /**
+   * Create decoration for undefined variable
+   */
+  createUndefinedVariableDecoration(
+    variableName: string,
+    range: vscode.Range,
+    fallbackColor?: ColorValue
+  ): vscode.DecorationOptions {
+    const chipSize = this.getChipSize();
+    const chipStyle = this.createChipStyle(fallbackColor || { hex: '#cccccc', rgb: { r: 204, g: 204, b: 204 }, hsl: { h: 0, s: 0, l: 80 }, original: '#cccccc', isValid: true }, chipSize);
+    
+    const decoration: vscode.DecorationOptions = {
+      range,
+      renderOptions: {
+        before: {
+          contentText: '?',
+          backgroundColor: fallbackColor?.hex || '#cccccc',
+          color: '#666666',
+          border: '1px dashed rgba(255, 0, 0, 0.5)',
+          width: chipStyle.width,
+          height: chipStyle.height,
+          margin: chipStyle.margin,
+          textDecoration: 'none; display: inline-block; vertical-align: middle; text-align: center; font-size: 8px;'
+        }
+      },
+      hoverMessage: this.createUndefinedVariableHoverMessage(variableName, fallbackColor)
+    };
+
+    return decoration;
+  }
+
+  /**
+   * Resolve overlapping decorations to prevent visual conflicts
+   */
+  private resolveOverlappingDecorations(decorations: vscode.DecorationOptions[]): vscode.DecorationOptions[] {
+    if (decorations.length <= 1) {
+      return decorations;
+    }
+
+    // Sort decorations by position
+    const sortedDecorations = [...decorations].sort((a, b) => {
+      const aStart = a.range.start;
+      const bStart = b.range.start;
+      
+      if (aStart.line !== bStart.line) {
+        return aStart.line - bStart.line;
+      }
+      return aStart.character - bStart.character;
+    });
+
+    const resolvedDecorations: vscode.DecorationOptions[] = [];
+    let lastEndPosition: vscode.Position | null = null;
+
+    for (const decoration of sortedDecorations) {
+      const currentStart = decoration.range.start;
+      
+      // Check for overlap with previous decoration
+      if (lastEndPosition && this.positionsOverlap(lastEndPosition, currentStart)) {
+        // Adjust position to avoid overlap
+        const adjustedDecoration = this.adjustDecorationPosition(decoration, lastEndPosition);
+        resolvedDecorations.push(adjustedDecoration);
+        lastEndPosition = adjustedDecoration.range.end;
+      } else {
+        resolvedDecorations.push(decoration);
+        lastEndPosition = decoration.range.end;
+      }
+    }
+
+    return resolvedDecorations;
+  }
+
+  /**
+   * Check if two positions overlap considering chip size
+   */
+  private positionsOverlap(endPos: vscode.Position, startPos: vscode.Position): boolean {
+    // Same line and positions are close enough to cause visual overlap
+    if (endPos.line === startPos.line) {
+      const chipSize = this.getChipSize();
+      const chipWidth = this.getChipWidthInCharacters(chipSize);
+      return (startPos.character - endPos.character) < chipWidth;
+    }
+    return false;
+  }
+
+  /**
+   * Get chip width in character units for overlap calculation
+   */
+  private getChipWidthInCharacters(size: ChipSize): number {
+    // Approximate character width based on chip size
+    const widths = {
+      small: 1,
+      medium: 2,
+      large: 3
+    };
+    return widths[size] || widths.medium;
+  }
+
+  /**
+   * Adjust decoration position to avoid overlap
+   */
+  private adjustDecorationPosition(
+    decoration: vscode.DecorationOptions,
+    lastEndPosition: vscode.Position
+  ): vscode.DecorationOptions {
+    const chipSize = this.getChipSize();
+    const chipWidth = this.getChipWidthInCharacters(chipSize);
+    
+    // Calculate new position with spacing
+    const newStartCharacter = lastEndPosition.character + chipWidth + 1; // +1 for spacing
+    const newRange = new vscode.Range(
+      decoration.range.start.line,
+      newStartCharacter,
+      decoration.range.end.line,
+      newStartCharacter + (decoration.range.end.character - decoration.range.start.character)
+    );
+
+    return {
+      ...decoration,
+      range: newRange
+    };
+  }
+
+  /**
+   * Create optimized decoration for multiple chips on same line
+   */
+  createCompactMultipleChips(
+    colors: ColorValue[],
+    baseRange: vscode.Range,
+    spacing: number = 1
+  ): vscode.DecorationOptions[] {
+    if (colors.length === 0) {
+      return [];
+    }
+
+    if (colors.length === 1) {
+      return [this.createColorChip(colors[0], baseRange)];
+    }
+
+    const chipSize = this.getChipSize();
+    const chipWidth = this.getChipWidthInCharacters(chipSize);
+    const decorations: vscode.DecorationOptions[] = [];
+
+    colors.forEach((color, index) => {
+      const offsetCharacter = baseRange.start.character + (index * (chipWidth + spacing));
+      const chipRange = new vscode.Range(
+        baseRange.start.line,
+        offsetCharacter,
+        baseRange.start.line,
+        offsetCharacter + chipWidth
+      );
+
+      const decoration = this.createColorChip(color, chipRange);
+      
+      // Add index indicator for multiple chips
+      if (decoration.renderOptions?.before) {
+        decoration.renderOptions.before.contentText = `${index + 1}`;
+        decoration.renderOptions.before.color = this.getContrastColor(color);
+        // Use textDecoration to include font styling
+        decoration.renderOptions.before.textDecoration = 'none; display: inline-block; vertical-align: middle; text-align: center; font-size: 6px; font-weight: bold;';
+      }
+
+      decorations.push(decoration);
+    });
+
+    return decorations;
+  }
+
+  /**
+   * Get contrasting color for text on color chip
+   */
+  private getContrastColor(color: ColorValue): string {
+    const luminance = this.calculateLuminance(color);
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+  }
+
+  /**
+   * Calculate relative luminance of a color
+   */
+  private calculateLuminance(color: ColorValue): number {
+    const r = color.rgb.r / 255;
+    const g = color.rgb.g / 255;
+    const b = color.rgb.b / 255;
+
+    // Apply gamma correction
+    const rLinear = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+    const gLinear = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+    const bLinear = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+    // Calculate luminance
+    return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+  }
+
+  /**
+   * Create stacked decoration for multiple colors in limited space
+   */
+  createStackedColorChips(
+    colors: ColorValue[],
+    range: vscode.Range,
+    maxVisible: number = 3
+  ): vscode.DecorationOptions {
+    if (colors.length === 0) {
+      throw new Error('At least one color is required');
+    }
+
+    if (colors.length === 1) {
+      return this.createColorChip(colors[0], range);
+    }
+
+    const chipSize = this.getChipSize();
+    const chipStyle = this.createChipStyle(colors[0], chipSize);
+    
+    // Show primary color with indicator for additional colors
+    const visibleColors = colors.slice(0, maxVisible);
+    const hiddenCount = Math.max(0, colors.length - maxVisible);
+    
+    const decoration: vscode.DecorationOptions = {
+      range,
+      renderOptions: {
+        before: {
+          contentText: hiddenCount > 0 ? `+${hiddenCount}` : `${colors.length}`,
+          backgroundColor: colors[0].hex,
+          color: this.getContrastColor(colors[0]),
+          border: this.getBorderStyle(colors[0]),
+          width: chipStyle.width,
+          height: chipStyle.height,
+          margin: chipStyle.margin,
+          textDecoration: 'none; display: inline-block; vertical-align: middle; text-align: center; font-size: 6px; font-weight: bold;'
+        }
+      },
+      hoverMessage: this.createStackedColorsHoverMessage(colors, visibleColors, hiddenCount)
+    };
+
+    return decoration;
+  }
+
+  /**
+   * Create hover message for stacked colors
+   */
+  private createStackedColorsHoverMessage(
+    allColors: ColorValue[],
+    visibleColors: ColorValue[],
+    hiddenCount: number
+  ): vscode.MarkdownString {
+    const markdown = new vscode.MarkdownString();
+    markdown.isTrusted = true;
+
+    markdown.appendMarkdown(`**Stacked Colors (${allColors.length} total)**\n\n`);
+
+    // Show visible colors
+    visibleColors.forEach((color, index) => {
+      const colorPreview = `<div style="width: 30px; height: 15px; background-color: ${color.hex}; border: 1px solid #ccc; display: inline-block; margin-right: 5px;"></div>`;
+      markdown.appendMarkdown(`${index + 1}. ${colorPreview} \`${color.hex}\` (${color.original})\n\n`);
+    });
+
+    // Show hidden count
+    if (hiddenCount > 0) {
+      markdown.appendMarkdown(`*... and ${hiddenCount} more colors*\n\n`);
+    }
+
+    markdown.appendMarkdown(`**Click to expand all colors**`);
+
+    return markdown;
+  }
+
+  /**
+   * Create hover message for undefined variable
+   */
+  private createUndefinedVariableHoverMessage(
+    variableName: string,
+    fallbackColor?: ColorValue
+  ): vscode.MarkdownString {
+    const markdown = new vscode.MarkdownString();
+    markdown.isTrusted = true;
+
+    markdown.appendMarkdown(`**⚠️ Undefined Variable**\n\n`);
+    markdown.appendMarkdown(`Variable \`${variableName}\` is not defined in the current scope.\n\n`);
+
+    if (fallbackColor) {
+      const colorPreview = `<div style="width: 30px; height: 15px; background-color: ${fallbackColor.hex}; border: 1px solid #ccc; display: inline-block; margin-right: 5px;"></div>`;
+      markdown.appendMarkdown(`**Fallback Color:** ${colorPreview} \`${fallbackColor.hex}\`\n\n`);
+    }
+
+    markdown.appendMarkdown(`**Suggestions:**\n`);
+    markdown.appendMarkdown(`- Define the variable in the current file or an imported file\n`);
+    markdown.appendMarkdown(`- Check for typos in the variable name\n`);
+    markdown.appendMarkdown(`- Ensure the variable is in scope\n`);
+
+    return markdown;
+  }
+}
