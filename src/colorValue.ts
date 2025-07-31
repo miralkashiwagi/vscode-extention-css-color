@@ -1,4 +1,5 @@
 import { ColorValue } from './types';
+import tinycolor from 'tinycolor2';
 
 export class ColorValueImpl implements ColorValue {
   public hex: string;
@@ -18,241 +19,151 @@ export class ColorValueImpl implements ColorValue {
   }
 
   private parseColor(): void {
-    const color = this.original.toLowerCase();
+    const colorString = this.original.trim();
 
-    // Try different color formats
-    if (this.parseHex(color) || 
-        this.parseRgb(color) || 
-        this.parseHsl(color) || 
-        this.parseNamedColor(color)) {
-      this.isValid = true;
-    }
-  }
-
-  private parseHex(color: string): boolean {
-    // Match #RGB, #RRGGBB, #RGBA, #RRGGBBAA
-    const hexMatch = color.match(/^#([0-9a-f]{3,8})$/);
-    if (!hexMatch) {return false;}
-
-    const hex = hexMatch[1];
-    let r: number, g: number, b: number, a: number = 1;
-
-    if (hex.length === 3) {
-      // #RGB -> #RRGGBB
-      r = parseInt(hex[0] + hex[0], 16);
-      g = parseInt(hex[1] + hex[1], 16);
-      b = parseInt(hex[2] + hex[2], 16);
-    } else if (hex.length === 4) {
-      // #RGBA -> #RRGGBBAA
-      r = parseInt(hex[0] + hex[0], 16);
-      g = parseInt(hex[1] + hex[1], 16);
-      b = parseInt(hex[2] + hex[2], 16);
-      a = parseInt(hex[3] + hex[3], 16) / 255;
-    } else if (hex.length === 6) {
-      // #RRGGBB
-      r = parseInt(hex.substr(0, 2), 16);
-      g = parseInt(hex.substr(2, 2), 16);
-      b = parseInt(hex.substr(4, 2), 16);
-    } else if (hex.length === 8) {
-      // #RRGGBBAA
-      r = parseInt(hex.substr(0, 2), 16);
-      g = parseInt(hex.substr(2, 2), 16);
-      b = parseInt(hex.substr(4, 2), 16);
-      a = parseInt(hex.substr(6, 2), 16) / 255;
-    } else {
-      return false;
+    // Skip pure numbers (like "55", "100", etc.) as they are not colors
+    if (this.isPureNumber(colorString)) {
+      return;
     }
 
-    this.rgb = { r, g, b };
-    if (a !== 1) {this.rgb.a = a;}
+    // Skip SCSS flags and keywords that are not colors
+    if (this.isNonColorKeyword(colorString.toLowerCase())) {
+      return;
+    }
+
+    // Skip CSS property values that are not colors
+    if (this.isNonColorPropertyValue(colorString.toLowerCase())) {
+      return;
+    }
+
+    // Use tinycolor2 to parse and validate the color
+    const color = tinycolor(colorString);
     
-    this.hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    this.hsl = this.rgbToHsl(r, g, b);
-    if (a !== 1) {this.hsl.a = a;}
-
-    return true;
-  }
-
-  private parseRgb(color: string): boolean {
-    // Match rgb(r, g, b) or rgba(r, g, b, a)
-    const rgbMatch = color.match(/rgba?\(\s*([^)]+)\s*\)/);
-    if (!rgbMatch) {return false;}
-
-    const values = rgbMatch[1].split(',').map(v => v.trim());
-    if (values.length < 3 || values.length > 4) {return false;}
-
-    const r = this.parseColorValue(values[0], 255);
-    const g = this.parseColorValue(values[1], 255);
-    const b = this.parseColorValue(values[2], 255);
-    const a = values.length === 4 ? this.parseAlpha(values[3]) : 1;
-
-    if (r === null || g === null || b === null || a === null) {return false;}
-
-    this.rgb = { r, g, b };
-    if (a !== 1) {this.rgb.a = a;}
-
-    this.hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    this.hsl = this.rgbToHsl(r, g, b);
-    if (a !== 1) {this.hsl.a = a;}
-
-    return true;
-  }
-
-  private parseHsl(color: string): boolean {
-    // Match hsl(h, s%, l%) or hsla(h, s%, l%, a)
-    const hslMatch = color.match(/hsla?\(\s*([^)]+)\s*\)/);
-    if (!hslMatch) {return false;}
-
-    const values = hslMatch[1].split(',').map(v => v.trim());
-    if (values.length < 3 || values.length > 4) {return false;}
-
-    const h = this.parseHue(values[0]);
-    const s = this.parsePercentage(values[1]);
-    const l = this.parsePercentage(values[2]);
-    const a = values.length === 4 ? this.parseAlpha(values[3]) : 1;
-
-    if (h === null || s === null || l === null || a === null) {return false;}
-
-    this.hsl = { h, s, l };
-    if (a !== 1) {this.hsl.a = a;}
-
-    const rgb = this.hslToRgb(h, s, l);
-    this.rgb = { r: rgb.r, g: rgb.g, b: rgb.b };
-    if (a !== 1) {this.rgb.a = a;}
-
-    this.hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
-
-    return true;
-  }
-
-  private parseNamedColor(color: string): boolean {
-    const namedColors: { [key: string]: string } = {
-      'black': '#000000', 'white': '#ffffff', 'red': '#ff0000', 'green': '#008000',
-      'blue': '#0000ff', 'yellow': '#ffff00', 'cyan': '#00ffff', 'magenta': '#ff00ff',
-      'silver': '#c0c0c0', 'gray': '#808080', 'maroon': '#800000', 'olive': '#808000',
-      'lime': '#00ff00', 'aqua': '#00ffff', 'teal': '#008080', 'navy': '#000080',
-      'fuchsia': '#ff00ff', 'purple': '#800080', 'orange': '#ffa500', 'transparent': '#00000000'
-    };
-
-    const hexValue = namedColors[color];
-    if (!hexValue) {return false;}
-
-    // Parse the hex value
-    const tempColor = new ColorValueImpl(hexValue);
-    if (!tempColor.isValid) {return false;}
-
-    this.hex = tempColor.hex;
-    this.rgb = tempColor.rgb;
-    this.hsl = tempColor.hsl;
-
-    return true;
-  }
-
-  private parseColorValue(value: string, max: number): number | null {
-    if (value.endsWith('%')) {
-      const percent = parseFloat(value.slice(0, -1));
-      if (isNaN(percent) || percent < 0 || percent > 100) {return null;}
-      return Math.round((percent / 100) * max);
-    } else {
-      const num = parseFloat(value);
-      if (isNaN(num) || num < 0 || num > max) {return null;}
-      return Math.round(num);
-    }
-  }
-
-  private parsePercentage(value: string): number | null {
-    if (!value.endsWith('%')) {return null;}
-    const percent = parseFloat(value.slice(0, -1));
-    if (isNaN(percent) || percent < 0 || percent > 100) {return null;}
-    return percent;
-  }
-
-  private parseHue(value: string): number | null {
-    const num = parseFloat(value);
-    if (isNaN(num)) {return null;}
-    return ((num % 360) + 360) % 360; // Normalize to 0-360
-  }
-
-  private parseAlpha(value: string): number | null {
-    if (value.endsWith('%')) {
-      const percent = parseFloat(value.slice(0, -1));
-      if (isNaN(percent) || percent < 0 || percent > 100) {return null;}
-      return percent / 100;
-    } else {
-      const num = parseFloat(value);
-      if (isNaN(num) || num < 0 || num > 1) {return null;}
-      return num;
-    }
-  }
-
-  private rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
-    r /= 255;
-    g /= 255;
-    b /= 255;
-
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const diff = max - min;
-    const sum = max + min;
-    const l = sum / 2;
-
-    let h: number, s: number;
-
-    if (diff === 0) {
-      h = s = 0; // achromatic
-    } else {
-      s = l > 0.5 ? diff / (2 - sum) : diff / sum;
-
-      switch (max) {
-        case r: h = (g - b) / diff + (g < b ? 6 : 0); break;
-        case g: h = (b - r) / diff + 2; break;
-        case b: h = (r - g) / diff + 4; break;
-        default: h = 0;
+    if (color.isValid()) {
+      this.isValid = true;
+      
+      // Get color values from tinycolor2
+      const rgb = color.toRgb();
+      const hsl = color.toHsl();
+      
+      this.hex = color.toHexString();
+      this.rgb = {
+        r: Math.round(rgb.r),
+        g: Math.round(rgb.g),
+        b: Math.round(rgb.b)
+      };
+      
+      if (rgb.a < 1) {
+        this.rgb.a = rgb.a;
       }
-      h /= 6;
+      
+      this.hsl = {
+        h: Math.round(hsl.h || 0),
+        s: Math.round(hsl.s * 100),
+        l: Math.round(hsl.l * 100)
+      };
+      
+      if (hsl.a < 1) {
+        this.hsl.a = hsl.a;
+      }
     }
-
-    return {
-      h: Math.round(h * 360),
-      s: Math.round(s * 100),
-      l: Math.round(l * 100)
-    };
   }
 
-  private hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
-    h /= 360;
-    s /= 100;
-    l /= 100;
-
-    const hue2rgb = (p: number, q: number, t: number): number => {
-      if (t < 0) {t += 1;}
-      if (t > 1) {t -= 1;}
-      if (t < 1/6) {return p + (q - p) * 6 * t;}
-      if (t < 1/2) {return q;}
-      if (t < 2/3) {return p + (q - p) * (2/3 - t) * 6;}
-      return p;
-    };
-
-    let r: number, g: number, b: number;
-
-    if (s === 0) {
-      r = g = b = l; // achromatic
-    } else {
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
+  private isPureNumber(value: string): boolean {
+    // Check if the value is just a number (with optional decimal point)
+    // This includes: "55", "100", "16.5", ".5", etc.
+    const numberRegex = /^-?\d*\.?\d+$/;
+    if (numberRegex.test(value)) {
+      return true;
     }
 
-    return {
-      r: Math.round(r * 255),
-      g: Math.round(g * 255),
-      b: Math.round(b * 255)
-    };
+    // Check if the value is a number with common CSS units (not colors)
+    const numberWithUnitRegex = /^-?\d*\.?\d+(px|em|rem|vh|vw|vmin|vmax|%|pt|pc|in|cm|mm|ex|ch|fr|s|ms|deg|rad|grad|turn)$/;
+    if (numberWithUnitRegex.test(value)) {
+      return true;
+    }
+
+    return false;
   }
 
-  // Static factory method
+  private isNonColorKeyword(value: string): boolean {
+    // SCSS/CSS keywords that are not colors
+    const nonColorKeywords = [
+      '!default', '!important', '!global', '!optional',
+      'inherit', 'initial', 'unset', 'revert', 'auto',
+      'none', 'normal', 'bold', 'italic', 'underline',
+      'left', 'right', 'center', 'top', 'bottom',
+      'block', 'inline', 'flex', 'grid', 'absolute', 'relative',
+      'fixed', 'static', 'sticky', 'hidden', 'visible',
+      'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge',
+      'inset', 'outset', 'border-box', 'content-box',
+      'ease', 'ease-in', 'ease-out', 'ease-in-out', 'linear'
+    ];
+
+    return nonColorKeywords.includes(value);
+  }
+
+  private isNonColorPropertyValue(value: string): boolean {
+    // Check for transition/animation values (contains timing functions and durations)
+    if (this.isTransitionValue(value)) {
+      return true;
+    }
+
+    // Check for transform values
+    if (this.isTransformValue(value)) {
+      return true;
+    }
+
+    // Check for calc() expressions
+    if (value.includes('calc(')) {
+      return true;
+    }
+
+    // Check for CSS functions that are not color functions
+    const nonColorFunctions = ['var(', 'attr(', 'url(', 'counter(', 'counters('];
+    if (nonColorFunctions.some(func => value.includes(func))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private isTransitionValue(value: string): boolean {
+    // Transition values typically contain timing functions and durations
+    const timingFunctions = ['ease', 'ease-in', 'ease-out', 'ease-in-out', 'linear', 'cubic-bezier'];
+    const timeUnits = ['s', 'ms'];
+    
+    // Check if value contains timing functions
+    if (timingFunctions.some(func => value.includes(func))) {
+      return true;
+    }
+
+    // Check if value contains time units (but not just time units)
+    const hasTimeUnit = timeUnits.some(unit => {
+      const regex = new RegExp(`\\d+${unit}\\b`);
+      return regex.test(value);
+    });
+
+    // If it has time units and multiple words, it's likely a transition
+    if (hasTimeUnit && value.split(/\s+/).length > 1) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private isTransformValue(value: string): boolean {
+    const transformFunctions = [
+      'translate', 'translate3d', 'translateX', 'translateY', 'translateZ',
+      'scale', 'scaleX', 'scaleY', 'scaleZ', 'scale3d',
+      'rotate', 'rotateX', 'rotateY', 'rotateZ', 'rotate3d',
+      'skew', 'skewX', 'skewY', 'matrix', 'matrix3d', 'perspective'
+    ];
+
+    return transformFunctions.some(func => value.includes(func + '('));
+  }
+
+  // Static factory method for creating ColorValue instances
   static fromString(colorString: string): ColorValue {
     return new ColorValueImpl(colorString);
   }

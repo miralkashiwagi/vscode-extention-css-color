@@ -34,14 +34,19 @@ export class DecorationProviderImpl implements DecorationProvider {
    * Apply decorations to a text editor
    */
   applyDecorations(editor: vscode.TextEditor, decorations: vscode.DecorationOptions[]): void {
-    if (!editor || decorations.length === 0) {
+    if (!editor) {
       return;
     }
 
     const editorId = editor.document.uri.toString();
     
-    // Clear existing decorations for this editor
+    // Always clear existing decorations for this editor first
     this.clearDecorations(editor);
+
+    // If no new decorations, we're done (old decorations are already cleared)
+    if (decorations.length === 0) {
+      return;
+    }
 
     // Resolve overlapping decorations
     const resolvedDecorations = this.resolveOverlappingDecorations(decorations);

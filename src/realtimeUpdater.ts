@@ -64,7 +64,11 @@ export class RealtimeUpdater {
    * Force update for specific document
    */
   forceUpdate(document: vscode.TextDocument): void {
-    if (!this.isActive || !this.shouldProcessDocument(document)) {
+    if (!this.isActive) {
+      return;
+    }
+    
+    if (!this.shouldProcessDocument(document)) {
       return;
     }
 
@@ -468,11 +472,13 @@ export class RealtimeUpdater {
       }
 
       // Use dynamic mode handler to get final color(s)
-      return this.dynamicModeHandler.resolveVariableColor(
+      const result = this.dynamicModeHandler.resolveVariableColor(
         variableName,
         defaultColorValue,
         document
       );
+
+      return result;
     } catch (error) {
       if (this.settingsManager.enableDebugLogging()) {
         console.warn(`Failed to resolve variable color ${variableName}:`, error);
@@ -564,4 +570,6 @@ export class RealtimeUpdater {
     this.updateTimers.forEach(timer => clearTimeout(timer));
     this.updateTimers.clear();
   }
+
+
 }

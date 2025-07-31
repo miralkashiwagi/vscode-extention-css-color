@@ -58,11 +58,8 @@ export class VariableResolverImpl implements VariableResolver {
       // Find the definition for this variable
       const definition = definitions.find(def => def.name === variableName);
       if (!definition) {
-        throw new VariableResolutionError(
-          variableName,
-          'Variable definition not found',
-          { documentUri: document.uri.toString() }
-        );
+        // Variable not found - this is normal, just return null
+        return null;
       }
 
       // Try to parse the value as a color
@@ -82,14 +79,8 @@ export class VariableResolverImpl implements VariableResolver {
         }
       }
 
-      throw new VariableResolutionError(
-        variableName,
-        'Variable value is not a valid color',
-        { 
-          documentUri: document.uri.toString(),
-          variableValue: definition.value
-        }
-      );
+      // Variable value is not a color - this is normal, just return null
+      return null;
     } catch (error) {
       if (error instanceof VariableResolutionError) {
         this.errorHandler.handleVariableResolutionError(error);
@@ -142,11 +133,8 @@ export class VariableResolverImpl implements VariableResolver {
           return workspaceResult;
         }
 
-        throw new VariableResolutionError(
-          variableName,
-          'SCSS variable definition not found',
-          { documentUri: document.uri.toString() }
-        );
+        // Variable not found - this is normal, just return null
+        return null;
       }
 
       // Try to parse the resolved value as a color
@@ -155,14 +143,8 @@ export class VariableResolverImpl implements VariableResolver {
         return colorValue;
       }
 
-      throw new VariableResolutionError(
-        variableName,
-        'SCSS variable value is not a valid color',
-        { 
-          documentUri: document.uri.toString(),
-          variableValue: resolvedValue
-        }
-      );
+      // Variable value is not a color - this is normal, just return null
+      return null;
     } catch (error) {
       if (error instanceof VariableResolutionError) {
         this.errorHandler.handleVariableResolutionError(error);
