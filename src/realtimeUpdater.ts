@@ -4,6 +4,7 @@ import { IncrementalAnalyzer } from './incrementalAnalyzer';
 import { VariableResolverImpl } from './variableResolver';
 import { DynamicModeHandlerImpl } from './dynamicModeHandler';
 import { ColorValue } from './types';
+import { ColorValueImpl } from './colorValue';
 
 export interface RealtimeUpdateOptions {
   enableTypingUpdates: boolean;
@@ -327,89 +328,113 @@ export class RealtimeUpdater {
   ): Promise<vscode.DecorationOptions[]> {
     const decorations: vscode.DecorationOptions[] = [];
     const settings = this.settingsManager;
+    const processedRanges = new Set<string>(); // Track processed ranges to avoid duplicates
 
-    // Process direct color values
+    // Helper function to check if range is already processed
+    const isRangeProcessed = (range: vscode.Range): boolean => {
+      const key = `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
+      return processedRanges.has(key);
+    };
+
+    // Helper function to mark range as processed
+    const markRangeProcessed = (range: vscode.Range): void => {
+      const key = `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
+      processedRanges.add(key);
+    };
+
+    // Process direct color values (highest priority)
     if (settings.showDirectColors()) {
       for (const colorMatch of analysisResult.colorMatches || []) {
-        const decoration = this.decorationProvider.createColorChip(
-          colorMatch.colorValue,
-          colorMatch.range
-        );
-        decorations.push(decoration);
+        if (!isRangeProcessed(colorMatch.range)) {
+          const decoration = this.decorationProvider.createColorChip(
+            colorMatch.colorValue,
+            colorMatch.range
+          );
+          decorations.push(decoration);
+          markRangeProcessed(colorMatch.range);
+        }
       }
     }
 
-    // Process variable definitions
+    // Process variable definitions (medium priority)
     if (settings.showVariableDefinitions()) {
       for (const varDef of analysisResult.variableDefinitions || []) {
-        const colorValue = await this.resolveVariableColor(varDef.name, varDef.value, document);
-        if (colorValue) {
-          if (Array.isArray(colorValue)) {
-            // Multiple colors
-            const decoration = this.decorationProvider.createMultipleColorChips(
-              colorValue,
-              varDef.range,
-              'Variable definition'
-            );
-            decorations.push(decoration);
-          } else {
-            // Single color
-            const decoration = this.decorationProvider.createVariableColorChip(
-              varDef.name,
-              colorValue,
-              varDef.range
-            );
-            decorations.push(decoration);
+        if (!isRangeProcessed(varDef.range)) {
+          const colorValue = await this.resolveVariableColor(varDef.name, varDef.value, document);
+          if (colorValue) {
+            if (Array.isArray(colorValue)) {
+              // Multiple colors
+              const decoration = this.decorationProvider.createMultipleColorChips(
+                colorValue,
+                varDef.range,
+                'Variable definition'
+              );
+              decorations.push(decoration);
+            } else {
+              // Single color
+              const decoration = this.decorationProvider.createVariableColorChip(
+                varDef.name,
+                colorValue,
+                varDef.range
+              );
+              decorations.push(decoration);
+            }
+            markRangeProcessed(varDef.range);
           }
         }
       }
     }
 
-    // Process variable usages
+    // Process variable usages (lowest priority)
     if (settings.showVariableUsages()) {
       for (const varUsage of analysisResult.variableUsages || []) {
-        const colorValue = await this.resolveVariableColor(varUsage.name, null, document);
-        if (colorValue) {
-          if (Array.isArray(colorValue)) {
-            // Multiple colors
-            const decoration = this.decorationProvider.createMultipleColorChips(
-              colorValue,
-              varUsage.range,
-              'Variable usage'
-            );
-            decorations.push(decoration);
+        if (!isRangeProcessed(varUsage.range)) {
+          const colorValue = await this.resolveVariableColor(varUsage.name, null, document);
+          if (colorValue) {
+            if (Array.isArray(colorValue)) {
+              // Multiple colors
+              const decoration = this.decorationProvider.createMultipleColorChips(
+                colorValue,
+                varUsage.range,
+                'Variable usage'
+              );
+              decorations.push(decoration);
+            } else {
+              // Single color
+              const fallbackColor = varUsage.fallbackValue 
+                ? await this.resolveColorValue(varUsage.fallbackValue)
+                : undefined;
+              
+              const decoration = this.decorationProvider.createVariableColorChip(
+                varUsage.name,
+                colorValue,
+                varUsage.range,
+                fallbackColor || undefined
+              );
+              decorations.push(decoration);
+            }
+            markRangeProcessed(varUsage.range);
+          } else if (varUsage.fallbackValue) {
+            // Show undefined variable with fallback
+            const fallbackColor = await this.resolveColorValue(varUsage.fallbackValue);
+            if (fallbackColor) {
+              const decoration = this.decorationProvider.createUndefinedVariableDecoration(
+                varUsage.name,
+                varUsage.range,
+                fallbackColor
+              );
+              decorations.push(decoration);
+              markRangeProcessed(varUsage.range);
+            }
           } else {
-            // Single color
-            const fallbackColor = varUsage.fallbackValue 
-              ? await this.resolveColorValue(varUsage.fallbackValue)
-              : undefined;
-            
-            const decoration = this.decorationProvider.createVariableColorChip(
-              varUsage.name,
-              colorValue,
-              varUsage.range,
-              fallbackColor || undefined
-            );
-            decorations.push(decoration);
-          }
-        } else if (varUsage.fallbackValue) {
-          // Show undefined variable with fallback
-          const fallbackColor = await this.resolveColorValue(varUsage.fallbackValue);
-          if (fallbackColor) {
+            // Show undefined variable
             const decoration = this.decorationProvider.createUndefinedVariableDecoration(
               varUsage.name,
-              varUsage.range,
-              fallbackColor
+              varUsage.range
             );
             decorations.push(decoration);
+            markRangeProcessed(varUsage.range);
           }
-        } else {
-          // Show undefined variable
-          const decoration = this.decorationProvider.createUndefinedVariableDecoration(
-            varUsage.name,
-            varUsage.range
-          );
-          decorations.push(decoration);
         }
       }
     }
@@ -435,9 +460,10 @@ export class RealtimeUpdater {
       // If no default color value, try to resolve from variable resolver
       if (!defaultColorValue) {
         if (variableName.startsWith('--')) {
-          defaultColorValue = this.variableResolver.resolveCSSVariable(variableName, document);
+          defaultColorValue = await this.variableResolver.resolveCSSVariable(variableName, document);
         } else if (variableName.startsWith('$')) {
-          defaultColorValue = this.variableResolver.resolveSCSSVariable(variableName, document);
+          // Use async resolution for SCSS variables to support workspace-wide search
+          defaultColorValue = await this.variableResolver.resolveSCSSVariable(variableName, document);
         }
       }
 
@@ -459,9 +485,16 @@ export class RealtimeUpdater {
    * Resolve color value from string
    */
   private async resolveColorValue(colorString: string): Promise<ColorValue | null> {
-    // This would use the ColorValue class to parse the color string
-    // For now, return null as a placeholder
-    return null;
+    try {
+      // Use ColorValueImpl to parse color strings
+      const colorValue = ColorValueImpl.fromString(colorString);
+      return colorValue.isValid ? colorValue : null;
+    } catch (error) {
+      if (this.settingsManager.enableDebugLogging()) {
+        console.warn(`Failed to resolve color value from string "${colorString}":`, error);
+      }
+      return null;
+    }
   }
 
   /**

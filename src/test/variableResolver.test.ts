@@ -13,7 +13,7 @@ suite('VariableResolver Tests', () => {
   });
 
   suite('CSS Variable Resolution', () => {
-    test('should resolve CSS custom property to color', () => {
+    test('should resolve CSS custom property to color', async () => {
       const css = `
         :root {
           --primary-color: #ff0000;
@@ -23,9 +23,9 @@ suite('VariableResolver Tests', () => {
       
       const mockDocument = createMockDocument(css, 'css');
       
-      const primaryColor = resolver.resolveCSSVariable('--primary-color', mockDocument);
-      const secondaryColor = resolver.resolveCSSVariable('--secondary-color', mockDocument);
-      const undefinedColor = resolver.resolveCSSVariable('--undefined', mockDocument);
+      const primaryColor = await resolver.resolveCSSVariable('--primary-color', mockDocument);
+      const secondaryColor = await resolver.resolveCSSVariable('--secondary-color', mockDocument);
+      const undefinedColor = await resolver.resolveCSSVariable('--undefined', mockDocument);
       
       assert.ok(primaryColor);
       assert.strictEqual(primaryColor.hex, '#ff0000');
@@ -38,7 +38,7 @@ suite('VariableResolver Tests', () => {
       assert.strictEqual(undefinedColor, null);
     });
 
-    test('should resolve CSS variable chains', () => {
+    test('should resolve CSS variable chains', async () => {
       const css = `
         :root {
           --base-color: #ff0000;
@@ -49,9 +49,9 @@ suite('VariableResolver Tests', () => {
       
       const mockDocument = createMockDocument(css, 'css');
       
-      const baseColor = resolver.resolveCSSVariable('--base-color', mockDocument);
-      const primaryColor = resolver.resolveCSSVariable('--primary-color', mockDocument);
-      const accentColor = resolver.resolveCSSVariable('--accent-color', mockDocument);
+      const baseColor = await resolver.resolveCSSVariable('--base-color', mockDocument);
+      const primaryColor = await resolver.resolveCSSVariable('--primary-color', mockDocument);
+      const accentColor = await resolver.resolveCSSVariable('--accent-color', mockDocument);
       
       assert.ok(baseColor);
       assert.strictEqual(baseColor.hex, '#ff0000');
@@ -63,7 +63,7 @@ suite('VariableResolver Tests', () => {
       assert.strictEqual(accentColor.hex, '#ff0000');
     });
 
-    test('should handle CSS variable fallbacks', () => {
+    test('should handle CSS variable fallbacks', async () => {
       const css = `
         :root {
           --defined-color: #ff0000;
@@ -78,8 +78,8 @@ suite('VariableResolver Tests', () => {
       const mockDocument = createMockDocument(css, 'css');
       
       // Test fallback resolution
-      const fallbackResult = resolver.resolveVariableWithFallback('--undefined-color', '#00ff00', mockDocument);
-      const definedResult = resolver.resolveVariableWithFallback('--defined-color', '#0000ff', mockDocument);
+      const fallbackResult = await resolver.resolveVariableWithFallback('--undefined-color', '#00ff00', mockDocument);
+      const definedResult = await resolver.resolveVariableWithFallback('--defined-color', '#0000ff', mockDocument);
       
       assert.ok(fallbackResult);
       assert.strictEqual(fallbackResult.hex, '#00ff00');
@@ -90,7 +90,7 @@ suite('VariableResolver Tests', () => {
   });
 
   suite('SCSS Variable Resolution', () => {
-    test('should resolve SCSS variables to colors', () => {
+    test('should resolve SCSS variables to colors', async () => {
       const scss = `
         $primary-color: #ff0000;
         $secondary-color: rgb(0, 255, 0);
@@ -99,10 +99,10 @@ suite('VariableResolver Tests', () => {
       
       const mockDocument = createMockDocument(scss, 'scss');
       
-      const primaryColor = resolver.resolveSCSSVariable('$primary-color', mockDocument);
-      const secondaryColor = resolver.resolveSCSSVariable('$secondary-color', mockDocument);
-      const fontSize = resolver.resolveSCSSVariable('$font-size', mockDocument);
-      const undefinedVar = resolver.resolveSCSSVariable('$undefined', mockDocument);
+      const primaryColor = await resolver.resolveSCSSVariable('$primary-color', mockDocument);
+      const secondaryColor = await resolver.resolveSCSSVariable('$secondary-color', mockDocument);
+      const fontSize = await resolver.resolveSCSSVariable('$font-size', mockDocument);
+      const undefinedVar = await resolver.resolveSCSSVariable('$undefined', mockDocument);
       
       assert.ok(primaryColor);
       assert.strictEqual(primaryColor.hex, '#ff0000');
@@ -114,7 +114,7 @@ suite('VariableResolver Tests', () => {
       assert.strictEqual(undefinedVar, null);
     });
 
-    test('should resolve SCSS variable chains', () => {
+    test('should resolve SCSS variable chains', async () => {
       const scss = `
         $base-color: #ff0000;
         $primary-color: $base-color;
@@ -124,9 +124,9 @@ suite('VariableResolver Tests', () => {
       
       const mockDocument = createMockDocument(scss, 'scss');
       
-      const baseColor = resolver.resolveSCSSVariable('$base-color', mockDocument);
-      const primaryColor = resolver.resolveSCSSVariable('$primary-color', mockDocument);
-      const accentColor = resolver.resolveSCSSVariable('$accent-color', mockDocument);
+      const baseColor = await resolver.resolveSCSSVariable('$base-color', mockDocument);
+      const primaryColor = await resolver.resolveSCSSVariable('$primary-color', mockDocument);
+      const accentColor = await resolver.resolveSCSSVariable('$accent-color', mockDocument);
       
       assert.ok(baseColor);
       assert.strictEqual(baseColor.hex, '#ff0000');
@@ -285,7 +285,7 @@ suite('VariableResolver Tests', () => {
       assert.ok(references.every(ref => ref.name === '--primary-color'));
     });
 
-    test('should find variable dependencies', () => {
+    test('should find variable dependencies', async () => {
       const scss = `
         $base-color: #ff0000;
         $primary-color: $base-color;
@@ -294,9 +294,9 @@ suite('VariableResolver Tests', () => {
       
       const mockDocument = createMockDocument(scss, 'scss');
       
-      const primaryDeps = resolver.findVariableDependencies('$primary-color', mockDocument);
-      const secondaryDeps = resolver.findVariableDependencies('$secondary-color', mockDocument);
-      const baseDeps = resolver.findVariableDependencies('$base-color', mockDocument);
+      const primaryDeps = await resolver.findVariableDependencies('$primary-color', mockDocument);
+      const secondaryDeps = await resolver.findVariableDependencies('$secondary-color', mockDocument);
+      const baseDeps = await resolver.findVariableDependencies('$base-color', mockDocument);
       
       assert.deepStrictEqual(primaryDeps, ['$base-color']);
       assert.ok(secondaryDeps.includes('$base-color'));
@@ -347,7 +347,7 @@ suite('VariableResolver Tests', () => {
   });
 
   suite('Color Extraction', () => {
-    test('should extract colors from variables', () => {
+    test('should extract colors from variables', async () => {
       const mixed = `
         :root {
           --css-color: #ff0000;
@@ -359,7 +359,7 @@ suite('VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(mixed, 'css'); // Mixed content
-      const colorResults = resolver.extractColorsFromVariables(mockDocument);
+      const colorResults = await resolver.extractColorsFromVariables(mockDocument);
       
 
       

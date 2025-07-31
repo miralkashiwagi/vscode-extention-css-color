@@ -392,8 +392,11 @@ export class DecorationProviderImpl implements DecorationProvider {
       return decorations;
     }
 
+    // Remove exact duplicates first
+    const uniqueDecorations = this.removeDuplicateDecorations(decorations);
+
     // Sort decorations by position
-    const sortedDecorations = [...decorations].sort((a, b) => {
+    const sortedDecorations = [...uniqueDecorations].sort((a, b) => {
       const aStart = a.range.start;
       const bStart = b.range.start;
       
@@ -404,24 +407,81 @@ export class DecorationProviderImpl implements DecorationProvider {
     });
 
     const resolvedDecorations: vscode.DecorationOptions[] = [];
-    let lastEndPosition: vscode.Position | null = null;
+    const usedPositions = new Set<string>();
 
     for (const decoration of sortedDecorations) {
-      const currentStart = decoration.range.start;
+      const positionKey = `${decoration.range.start.line}:${decoration.range.start.character}`;
       
-      // Check for overlap with previous decoration
-      if (lastEndPosition && this.positionsOverlap(lastEndPosition, currentStart)) {
-        // Adjust position to avoid overlap
-        const adjustedDecoration = this.adjustDecorationPosition(decoration, lastEndPosition);
-        resolvedDecorations.push(adjustedDecoration);
-        lastEndPosition = adjustedDecoration.range.end;
-      } else {
+      // Skip if we already have a decoration at this exact position
+      if (usedPositions.has(positionKey)) {
+        continue;
+      }
+
+      // Check for overlap with nearby decorations
+      const hasOverlap = resolvedDecorations.some(existing => 
+        this.decorationsOverlap(existing, decoration)
+      );
+
+      if (!hasOverlap) {
         resolvedDecorations.push(decoration);
-        lastEndPosition = decoration.range.end;
+        usedPositions.add(positionKey);
       }
     }
 
     return resolvedDecorations;
+  }
+
+  /**
+   * Remove exact duplicate decorations
+   */
+  private removeDuplicateDecorations(decorations: vscode.DecorationOptions[]): vscode.DecorationOptions[] {
+    const seen = new Set<string>();
+    const unique: vscode.DecorationOptions[] = [];
+
+    for (const decoration of decorations) {
+      const key = this.getDecorationKey(decoration);
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(decoration);
+      }
+    }
+
+    return unique;
+  }
+
+  /**
+   * Generate a unique key for a decoration
+   */
+  private getDecorationKey(decoration: vscode.DecorationOptions): string {
+    const range = decoration.range;
+    const color = decoration.renderOptions?.before?.backgroundColor || '';
+    return `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}:${color}`;
+  }
+
+  /**
+   * Check if two decorations overlap
+   */
+  private decorationsOverlap(decoration1: vscode.DecorationOptions, decoration2: vscode.DecorationOptions): boolean {
+    const range1 = decoration1.range;
+    const range2 = decoration2.range;
+
+    // Check if ranges overlap
+    if (range1.start.line !== range2.start.line) {
+      return false;
+    }
+
+    // Same line - check character overlap with chip width consideration
+    const chipSize = this.getChipSize();
+    const chipWidth = this.getChipWidthInCharacters(chipSize);
+    
+    const start1 = range1.start.character;
+    const end1 = range1.end.character;
+    const start2 = range2.start.character;
+    const end2 = range2.end.character;
+
+    // Consider chip visual width when checking overlap
+    return Math.abs(start1 - start2) < chipWidth || 
+           (start1 <= end2 + chipWidth && end1 + chipWidth >= start2);
   }
 
   /**

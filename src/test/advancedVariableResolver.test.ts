@@ -13,7 +13,7 @@ suite('Advanced VariableResolver Tests', () => {
   });
 
   suite('Circular Reference Detection', () => {
-    test('should detect simple circular references', () => {
+    test('should detect simple circular references', async () => {
       const scss = `
         $color-a: $color-b;
         $color-b: $color-a;
@@ -21,7 +21,7 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const cycles = resolver.detectCircularReferences(mockDocument);
+      const cycles = await resolver.detectCircularReferences(mockDocument);
       
       assert.strictEqual(cycles.length, 1);
       assert.ok(cycles[0].cycle.includes('$color-a'));
@@ -29,7 +29,7 @@ suite('Advanced VariableResolver Tests', () => {
       assert.strictEqual(cycles[0].variables.length, 2);
     });
 
-    test('should detect complex circular references', () => {
+    test('should detect complex circular references', async () => {
       const scss = `
         $color-a: $color-b;
         $color-b: $color-c;
@@ -38,7 +38,7 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const cycles = resolver.detectCircularReferences(mockDocument);
+      const cycles = await resolver.detectCircularReferences(mockDocument);
       
       assert.strictEqual(cycles.length, 1);
       assert.strictEqual(cycles[0].cycle.length, 3);
@@ -47,7 +47,7 @@ suite('Advanced VariableResolver Tests', () => {
       assert.ok(cycles[0].cycle.includes('$color-c'));
     });
 
-    test('should not detect false positives', () => {
+    test('should not detect false positives', async () => {
       const scss = `
         $base-color: #ff0000;
         $primary-color: $base-color;
@@ -56,14 +56,14 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const cycles = resolver.detectCircularReferences(mockDocument);
+      const cycles = await resolver.detectCircularReferences(mockDocument);
       
       assert.strictEqual(cycles.length, 0);
     });
   });
 
   suite('Affected Variables Analysis', () => {
-    test('should find variables affected by changes', () => {
+    test('should find variables affected by changes', async () => {
       const scss = `
         $base-color: #ff0000;
         $primary-color: $base-color;
@@ -74,7 +74,7 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const affected = resolver.findAffectedVariables('$base-color', mockDocument);
+      const affected = await resolver.findAffectedVariables('$base-color', mockDocument);
       
       assert.ok(affected.length >= 4); // primary, secondary, accent, hover
       
@@ -86,7 +86,7 @@ suite('Advanced VariableResolver Tests', () => {
       assert.ok(!affectedNames.includes('$unrelated-color'));
     });
 
-    test('should provide dependency chains', () => {
+    test('should provide dependency chains', async () => {
       const scss = `
         $base-color: #ff0000;
         $primary-color: $base-color;
@@ -94,7 +94,7 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const affected = resolver.findAffectedVariables('$base-color', mockDocument);
+      const affected = await resolver.findAffectedVariables('$base-color', mockDocument);
       
       const accentAffected = affected.find(a => a.variable.name === '$accent-color');
       assert.ok(accentAffected);
@@ -103,7 +103,7 @@ suite('Advanced VariableResolver Tests', () => {
   });
 
   suite('Theme Context Resolution', () => {
-    test('should resolve theme-specific variables', () => {
+    test('should resolve theme-specific variables', async () => {
       const css = `
         :root {
           --color: #ff0000;
@@ -114,9 +114,9 @@ suite('Advanced VariableResolver Tests', () => {
       
       const mockDocument = createMockDocument(css, 'css');
       
-      const defaultColor = resolver.resolveVariableWithTheme('--color', mockDocument);
-      const lightColor = resolver.resolveVariableWithTheme('--color', mockDocument, 'light');
-      const darkColor = resolver.resolveVariableWithTheme('--color', mockDocument, 'dark');
+      const defaultColor = await resolver.resolveVariableWithTheme('--color', mockDocument);
+      const lightColor = await resolver.resolveVariableWithTheme('--color', mockDocument, 'light');
+      const darkColor = await resolver.resolveVariableWithTheme('--color', mockDocument, 'dark');
       
       assert.ok(defaultColor);
       assert.strictEqual(defaultColor.hex, '#ff0000');
@@ -128,7 +128,7 @@ suite('Advanced VariableResolver Tests', () => {
       assert.strictEqual(darkColor.hex, '#cc0000');
     });
 
-    test('should fallback to default when theme variant not found', () => {
+    test('should fallback to default when theme variant not found', async () => {
       const scss = `
         $color: #ff0000;
         $light-color: #ff6666;
@@ -137,8 +137,8 @@ suite('Advanced VariableResolver Tests', () => {
       
       const mockDocument = createMockDocument(scss, 'scss');
       
-      const lightColor = resolver.resolveVariableWithTheme('$color', mockDocument, 'light');
-      const darkColor = resolver.resolveVariableWithTheme('$color', mockDocument, 'dark');
+      const lightColor = await resolver.resolveVariableWithTheme('$color', mockDocument, 'light');
+      const darkColor = await resolver.resolveVariableWithTheme('$color', mockDocument, 'dark');
       
       assert.ok(lightColor);
       assert.strictEqual(lightColor.hex, '#ff6666');
@@ -149,7 +149,7 @@ suite('Advanced VariableResolver Tests', () => {
   });
 
   suite('Variable Validation', () => {
-    test('should validate variable definitions', () => {
+    test('should validate variable definitions', async () => {
       const scss = `
         $valid-color: #ff0000;
         $circular-a: $circular-b;
@@ -160,7 +160,7 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const validation = resolver.validateVariableDefinitions(mockDocument);
+      const validation = await resolver.validateVariableDefinitions(mockDocument);
       
       assert.ok(validation.length >= 3); // At least circular, undefined, and naming issues
       
@@ -185,7 +185,7 @@ suite('Advanced VariableResolver Tests', () => {
   });
 
   suite('Usage Report Generation', () => {
-    test('should generate comprehensive usage report', () => {
+    test('should generate comprehensive usage report', async () => {
       const scss = `
         $used-once: #ff0000;
         $used-multiple: #00ff00;
@@ -203,7 +203,7 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const report = resolver.generateUsageReport(mockDocument);
+      const report = await resolver.generateUsageReport(mockDocument);
       
       assert.strictEqual(report.totalVariables, 4);
       assert.strictEqual(report.usedVariables, 2); // used-once, used-multiple
@@ -219,7 +219,7 @@ suite('Advanced VariableResolver Tests', () => {
   });
 
   suite('Variable Optimization', () => {
-    test('should suggest optimizations', () => {
+    test('should suggest optimizations', async () => {
       const scss = `
         $unused-var: #ff0000;
         $used-once: #00ff00;
@@ -236,7 +236,7 @@ suite('Advanced VariableResolver Tests', () => {
       `;
       
       const mockDocument = createMockDocument(scss, 'scss');
-      const optimizations = resolver.optimizeVariables(mockDocument);
+      const optimizations = await resolver.optimizeVariables(mockDocument);
       
       assert.ok(optimizations.length >= 2);
       
@@ -275,7 +275,7 @@ suite('Advanced VariableResolver Tests', () => {
   });
 
   suite('Complex Dependency Analysis', () => {
-    test('should handle complex variable dependency scenarios', () => {
+    test('should handle complex variable dependency scenarios', async () => {
       const scss = `
         // Base colors
         $red: #ff0000;
@@ -304,7 +304,7 @@ suite('Advanced VariableResolver Tests', () => {
       const mockDocument = createMockDocument(scss, 'scss');
       
       // Test dependency tracking
-      const redDependencies = resolver.findAffectedVariables('$red', mockDocument);
+      const redDependencies = await resolver.findAffectedVariables('$red', mockDocument);
       const redAffectedNames = redDependencies.map(d => d.variable.name);
       
       assert.ok(redAffectedNames.includes('$primary'));
@@ -343,13 +343,13 @@ suite('Advanced VariableResolver Tests', () => {
       });
     });
 
-    test('should handle empty documents', () => {
+    test('should handle empty documents', async () => {
       const emptyDocument = createMockDocument('', 'scss');
       
       const definitions = resolver.findVariableDefinitions(emptyDocument);
       const usages = resolver.findVariableUsages(emptyDocument);
-      const cycles = resolver.detectCircularReferences(emptyDocument);
-      const report = resolver.generateUsageReport(emptyDocument);
+      const cycles = await resolver.detectCircularReferences(emptyDocument);
+      const report = await resolver.generateUsageReport(emptyDocument);
       
       assert.strictEqual(definitions.length, 0);
       assert.strictEqual(usages.length, 0);

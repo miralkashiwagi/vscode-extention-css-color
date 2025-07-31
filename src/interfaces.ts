@@ -20,8 +20,8 @@ export interface ColorChipManager {
 
 // Variable resolution interface
 export interface VariableResolver {
-  resolveCSSVariable(variableName: string, document: vscode.TextDocument): ColorValue | null;
-  resolveSCSSVariable(variableName: string, document: vscode.TextDocument): ColorValue | null;
+  resolveCSSVariable(variableName: string, document: vscode.TextDocument): Promise<ColorValue | null>;
+  resolveSCSSVariable(variableName: string, document: vscode.TextDocument): Promise<ColorValue | null>;
   findVariableDefinitions(document: vscode.TextDocument): VariableDefinition[];
   findVariableUsages(document: vscode.TextDocument): VariableUsage[];
 }

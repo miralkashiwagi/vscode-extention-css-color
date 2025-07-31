@@ -30,19 +30,27 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Resolve CSS custom property value
    */
-  resolveCSSVariable(variableName: string, document: vscode.TextDocument): ColorValue | null {
-    return safeExecuteSync(
-      () => this.resolveCSSVariableInternal(variableName, document),
-      null,
-      this.errorHandler,
-      `resolveCSSVariable(${variableName})`
-    );
+  async resolveCSSVariable(variableName: string, document: vscode.TextDocument): Promise<ColorValue | null> {
+    try {
+      return await withTimeout(
+        this.resolveCSSVariableInternal(variableName, document),
+        this.RESOLUTION_TIMEOUT_MS,
+        `resolveCSSVariable(${variableName})`
+      );
+    } catch (error) {
+      if (error instanceof PerformanceTimeoutError) {
+        this.errorHandler.handlePerformanceTimeoutError(error);
+      } else {
+        this.errorHandler.handleError(error instanceof Error ? error : new Error(String(error)));
+      }
+      return null;
+    }
   }
 
   /**
    * Internal CSS variable resolution with error handling
    */
-  private resolveCSSVariableInternal(variableName: string, document: vscode.TextDocument): ColorValue | null {
+  private async resolveCSSVariableInternal(variableName: string, document: vscode.TextDocument): Promise<ColorValue | null> {
     try {
       const text = document.getText();
       const definitions = this.cssParser.findVariableDefinitions(text);
@@ -65,7 +73,7 @@ export class VariableResolverImpl implements VariableResolver {
 
       // If the value contains another CSS variable, try to resolve it
       if (definition.value.includes('var(')) {
-        const resolvedValue = this.resolveCSSVariableChain(variableName, text, 0);
+        const resolvedValue = await this.resolveCSSVariableChain(variableName, text, 0);
         if (resolvedValue) {
           const resolvedColor = ColorValueImpl.fromString(resolvedValue);
           if (resolvedColor.isValid) {
@@ -93,26 +101,47 @@ export class VariableResolverImpl implements VariableResolver {
   }
 
   /**
-   * Resolve SCSS variable value
+   * Resolve SCSS variable value with workspace-wide search
    */
-  resolveSCSSVariable(variableName: string, document: vscode.TextDocument): ColorValue | null {
-    return safeExecuteSync(
-      () => this.resolveSCSSVariableInternal(variableName, document),
-      null,
-      this.errorHandler,
-      `resolveSCSSVariable(${variableName})`
-    );
+  async resolveSCSSVariable(variableName: string, document: vscode.TextDocument): Promise<ColorValue | null> {
+    try {
+      return await withTimeout(
+        this.resolveSCSSVariableInternal(variableName, document),
+        this.RESOLUTION_TIMEOUT_MS,
+        `resolveSCSSVariableAsync(${variableName})`
+      );
+    } catch (error) {
+      if (error instanceof PerformanceTimeoutError) {
+        this.errorHandler.handlePerformanceTimeoutError(error);
+      } else {
+        this.errorHandler.handleError(error instanceof Error ? error : new Error(String(error)));
+      }
+      return null;
+    }
   }
 
   /**
    * Internal SCSS variable resolution with error handling
    */
-  private resolveSCSSVariableInternal(variableName: string, document: vscode.TextDocument): ColorValue | null {
+  private async resolveSCSSVariableInternal(variableName: string, document: vscode.TextDocument): Promise<ColorValue | null> {
     try {
       const text = document.getText();
-      const resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
+      let resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
       
+      // If not found in current file, try to resolve from imports
       if (!resolvedValue) {
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+        const importResult = await this.resolveFromSCSSImports(variableName, document, workspaceFolder);
+        if (importResult) {
+          return importResult;
+        }
+
+        // If still not found, try workspace-wide search
+        const workspaceResult = await this.resolveFromWorkspace(variableName, document);
+        if (workspaceResult) {
+          return workspaceResult;
+        }
+
         throw new VariableResolutionError(
           variableName,
           'SCSS variable definition not found',
@@ -219,13 +248,13 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Resolve variable value with fallback support
    */
-  resolveVariableWithFallback(
+  async resolveVariableWithFallback(
     variableName: string, 
     fallbackValue: string | undefined, 
     document: vscode.TextDocument
-  ): ColorValue | null {
+  ): Promise<ColorValue | null> {
     // First try to resolve the variable
-    const resolvedValue = this.resolveVariable(variableName, document);
+    const resolvedValue = await this.resolveVariable(variableName, document);
     if (resolvedValue) {
       return resolvedValue;
     }
@@ -239,7 +268,7 @@ export class VariableResolverImpl implements VariableResolver {
 
       // If fallback contains variables, try to resolve them
       if (fallbackValue.includes('var(') || fallbackValue.includes('$')) {
-        return this.resolveFallbackValue(fallbackValue, document);
+        return await this.resolveFallbackValue(fallbackValue, document);
       }
     }
 
@@ -249,11 +278,11 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Resolve a variable (CSS or SCSS) based on its name
    */
-  private resolveVariable(variableName: string, document: vscode.TextDocument): ColorValue | null {
+  private async resolveVariable(variableName: string, document: vscode.TextDocument): Promise<ColorValue | null> {
     if (variableName.startsWith('--')) {
       return this.resolveCSSVariable(variableName, document);
     } else if (variableName.startsWith('$')) {
-      return this.resolveSCSSVariable(variableName, document);
+      return await this.resolveSCSSVariable(variableName, document);
     }
     
     return null;
@@ -262,7 +291,7 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Resolve CSS variable chain (var() references)
    */
-  private resolveCSSVariableChain(variableName: string, text: string, depth: number = 0, visited: Set<string> = new Set()): string | null {
+  private async resolveCSSVariableChain(variableName: string, text: string, depth: number = 0, visited: Set<string> = new Set()): Promise<string | null> {
     // Prevent infinite recursion
     if (depth >= this.MAX_RESOLUTION_DEPTH) {
       throw new VariableResolutionError(
@@ -303,7 +332,7 @@ export class VariableResolverImpl implements VariableResolver {
       
       for (const usage of varUsages) {
         try {
-          const referencedValue = this.resolveCSSVariableChain(usage.name, text, depth + 1, newVisited);
+          const referencedValue = await this.resolveCSSVariableChain(usage.name, text, depth + 1, newVisited);
           if (referencedValue) {
             // Replace the var() call with the resolved value
             const varCall = usage.fallbackValue 
@@ -339,14 +368,14 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Resolve fallback value that may contain variables
    */
-  private resolveFallbackValue(fallbackValue: string, document: vscode.TextDocument): ColorValue | null {
+  private async resolveFallbackValue(fallbackValue: string, document: vscode.TextDocument): Promise<ColorValue | null> {
     let resolvedValue = fallbackValue;
 
     // Handle CSS var() in fallback
     if (fallbackValue.includes('var(')) {
       const varUsages = this.cssParser.findVariableUsages(fallbackValue);
       for (const usage of varUsages) {
-        const resolved = this.resolveCSSVariable(usage.name, document);
+        const resolved = await this.resolveCSSVariable(usage.name, document);
         if (resolved) {
           const varCall = usage.fallbackValue 
             ? `var(${usage.name}, ${usage.fallbackValue})`
@@ -360,7 +389,7 @@ export class VariableResolverImpl implements VariableResolver {
     if (fallbackValue.includes('$')) {
       const scssUsages = this.scssParser.findVariableUsages(fallbackValue);
       for (const usage of scssUsages) {
-        const resolved = this.resolveSCSSVariable(usage.name, document);
+        const resolved = await this.resolveSCSSVariable(usage.name, document);
         if (resolved) {
           resolvedValue = resolvedValue.replace(usage.name, resolved.original);
         }
@@ -382,7 +411,7 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Get all variables that are referenced by a given variable
    */
-  findVariableDependencies(sourceVariable: string, document: vscode.TextDocument): string[] {
+  async findVariableDependencies(sourceVariable: string, document: vscode.TextDocument): Promise<string[]> {
     const definitions = this.findVariableDefinitions(document);
     const definition = definitions.find(def => def.name === sourceVariable);
     
@@ -426,22 +455,22 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Get all color values from variable definitions
    */
-  extractColorsFromVariables(document: vscode.TextDocument): Array<{
+  async extractColorsFromVariables(document: vscode.TextDocument): Promise<Array<{
     variable: VariableDefinition;
     color: ColorValue;
-  }> {
+  }>> {
     const definitions = this.findVariableDefinitions(document);
     const results: Array<{ variable: VariableDefinition; color: ColorValue }> = [];
 
-    definitions.forEach(def => {
-      const resolvedColor = this.resolveVariable(def.name, document);
+    for (const def of definitions) {
+      const resolvedColor = await this.resolveVariable(def.name, document);
       if (resolvedColor) {
         results.push({
           variable: def,
           color: resolvedColor
         });
       }
-    });
+    }
 
     return results;
   }
@@ -502,7 +531,7 @@ export class VariableResolverImpl implements VariableResolver {
     workspaceFolder?: vscode.WorkspaceFolder
   ): Promise<ColorValue | null> {
     // First try to resolve in current document
-    const localResult = this.resolveVariable(variableName, document);
+    const localResult = await this.resolveVariable(variableName, document);
     if (localResult) {
       return localResult;
     }
@@ -531,7 +560,7 @@ export class VariableResolverImpl implements VariableResolver {
     for (const importStmt of imports) {
       const importedDocument = await this.resolveImportPath(importStmt.path, document, workspaceFolder);
       if (importedDocument) {
-        const result = this.resolveSCSSVariable(variableName, importedDocument);
+        const result = await this.resolveSCSSVariable(variableName, importedDocument);
         if (result) {
           return result;
         }
@@ -557,7 +586,7 @@ export class VariableResolverImpl implements VariableResolver {
           }
         }
 
-        const result = this.resolveSCSSVariable(searchVariableName, importedDocument);
+        const result = await this.resolveSCSSVariable(searchVariableName, importedDocument);
         if (result) {
           return result;
         }
@@ -628,21 +657,85 @@ export class VariableResolverImpl implements VariableResolver {
   }
 
   /**
+   * Resolve variable from workspace-wide search
+   */
+  private async resolveFromWorkspace(
+    variableName: string,
+    currentDocument: vscode.TextDocument
+  ): Promise<ColorValue | null> {
+    try {
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(currentDocument.uri);
+      if (!workspaceFolder) {
+        return null;
+      }
+
+      // Search for SCSS/CSS files in workspace
+      const filePattern = new vscode.RelativePattern(workspaceFolder, '**/*.{scss,sass,css}');
+      const files = await vscode.workspace.findFiles(filePattern, '**/node_modules/**');
+
+      // Search each file for the variable definition
+      for (const fileUri of files) {
+        // Skip current document as it was already checked
+        if (fileUri.toString() === currentDocument.uri.toString()) {
+          continue;
+        }
+
+        try {
+          const document = await vscode.workspace.openTextDocument(fileUri);
+          const text = document.getText();
+          
+          // Check if this file contains the variable definition
+          if (document.languageId === 'scss' || document.languageId === 'sass') {
+            const resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
+            if (resolvedValue) {
+              const colorValue = ColorValueImpl.fromString(resolvedValue);
+              if (colorValue.isValid) {
+                return colorValue;
+              }
+            }
+          } else if (document.languageId === 'css') {
+            // Also check CSS files for CSS custom properties
+            if (variableName.startsWith('--')) {
+              const definitions = this.cssParser.findVariableDefinitions(text);
+              const definition = definitions.find(def => def.name === variableName);
+              if (definition) {
+                const colorValue = ColorValueImpl.fromString(definition.value);
+                if (colorValue.isValid) {
+                  return colorValue;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // Skip files that can't be opened or parsed
+          console.warn(`Failed to search variable in file: ${fileUri.toString()}`, error);
+          continue;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn(`Workspace-wide variable search failed for ${variableName}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Detect circular references in variable definitions
    */
-  detectCircularReferences(document: vscode.TextDocument): Array<{
+  async detectCircularReferences(document: vscode.TextDocument): Promise<Array<{
     cycle: string[];
     variables: VariableDefinition[];
-  }> {
+  }>> {
     const definitions = this.findVariableDefinitions(document);
     const dependencyGraph = new Map<string, string[]>();
     const cycles: Array<{ cycle: string[]; variables: VariableDefinition[] }> = [];
 
     // Build dependency graph
-    definitions.forEach(def => {
-      const dependencies = this.findVariableDependencies(def.name, document);
+    for (const def of definitions) {
+      const dependencies = await this.findVariableDependencies(def.name, document);
       dependencyGraph.set(def.name, dependencies);
-    });
+    }
 
     // Detect cycles using DFS
     const visited = new Set<string>();
@@ -758,25 +851,25 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Find all variables that would be affected by changing a specific variable
    */
-  findAffectedVariables(
+  async findAffectedVariables(
     targetVariable: string,
     document: vscode.TextDocument
-  ): Array<{
+  ): Promise<Array<{
     variable: VariableDefinition;
     dependencyChain: string[];
-  }> {
+  }>> {
     const definitions = this.findVariableDefinitions(document);
     const affected: Array<{ variable: VariableDefinition; dependencyChain: string[] }> = [];
     const visited = new Set<string>();
 
-    const findDependents = (variable: string, chain: string[]) => {
+    const findDependents = async (variable: string, chain: string[]) => {
       if (visited.has(variable)) {
         return; // Prevent infinite recursion
       }
       visited.add(variable);
 
-      definitions.forEach(def => {
-        const dependencies = this.findVariableDependencies(def.name, document);
+      for (const def of definitions) {
+        const dependencies = await this.findVariableDependencies(def.name, document);
         if (dependencies.includes(variable) && !chain.includes(def.name)) {
           const newChain = [...chain, def.name];
           affected.push({
@@ -785,34 +878,34 @@ export class VariableResolverImpl implements VariableResolver {
           });
           
           // Recursively find dependents
-          findDependents(def.name, newChain);
+          await findDependents(def.name, newChain);
         }
-      });
+      }
     };
 
-    findDependents(targetVariable, [targetVariable]);
+    await findDependents(targetVariable, [targetVariable]);
     return affected;
   }
 
   /**
    * Resolve variable with theme context support
    */
-  resolveVariableWithTheme(
+  async resolveVariableWithTheme(
     variableName: string,
     document: vscode.TextDocument,
     themeContext?: 'light' | 'dark' | 'auto'
-  ): ColorValue | null {
+  ): Promise<ColorValue | null> {
     // If theme context is provided, look for theme-specific variables first
     if (themeContext && themeContext !== 'auto') {
       const themeVariableName = this.getThemeVariableName(variableName, themeContext);
-      const themeResult = this.resolveVariable(themeVariableName, document);
+      const themeResult = await this.resolveVariable(themeVariableName, document);
       if (themeResult) {
         return themeResult;
       }
     }
 
     // Fallback to direct resolution
-    const directResult = this.resolveVariable(variableName, document);
+    const directResult = await this.resolveVariable(variableName, document);
     if (directResult) {
       return directResult;
     }
@@ -839,22 +932,24 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Validate variable definitions for potential issues
    */
-  validateVariableDefinitions(document: vscode.TextDocument): Array<{
+  async validateVariableDefinitions(document: vscode.TextDocument): Promise<Array<{
     variable: VariableDefinition;
     issues: Array<{
       type: 'circular-reference' | 'undefined-dependency' | 'invalid-color' | 'naming-convention';
       message: string;
       severity: 'error' | 'warning' | 'info';
     }>;
-  }> {
+  }>> {
     const definitions = this.findVariableDefinitions(document);
     const results: Array<{ variable: VariableDefinition; issues: Array<any> }> = [];
 
-    definitions.forEach(def => {
+    // Check for circular references once for all variables
+    const cycles = await this.detectCircularReferences(document);
+
+    for (const def of definitions) {
       const issues: Array<any> = [];
 
       // Check for circular references
-      const cycles = this.detectCircularReferences(document);
       const isInCycle = cycles.some(cycle => cycle.cycle.includes(def.name));
       if (isInCycle) {
         issues.push({
@@ -865,7 +960,7 @@ export class VariableResolverImpl implements VariableResolver {
       }
 
       // Check for undefined dependencies
-      const dependencies = this.findVariableDependencies(def.name, document);
+      const dependencies = await this.findVariableDependencies(def.name, document);
       const definedVariables = new Set(definitions.map(d => d.name));
       dependencies.forEach(dep => {
         if (!definedVariables.has(dep)) {
@@ -878,7 +973,7 @@ export class VariableResolverImpl implements VariableResolver {
       });
 
       // Check if color values are valid
-      const resolvedColor = this.resolveVariable(def.name, document);
+      const resolvedColor = await this.resolveVariable(def.name, document);
       if (def.value.match(/#[0-9a-fA-F]{3,8}|rgb|hsl|color/) && !resolvedColor) {
         issues.push({
           type: 'invalid-color',
@@ -905,7 +1000,7 @@ export class VariableResolverImpl implements VariableResolver {
       if (issues.length > 0) {
         results.push({ variable: def, issues });
       }
-    });
+    }
 
     return results;
   }
@@ -913,16 +1008,16 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Generate variable usage report
    */
-  generateUsageReport(document: vscode.TextDocument): {
+  async generateUsageReport(document: vscode.TextDocument): Promise<{
     totalVariables: number;
     usedVariables: number;
     unusedVariables: VariableDefinition[];
     mostUsedVariables: Array<{ variable: VariableDefinition; usageCount: number }>;
     colorVariables: Array<{ variable: VariableDefinition; color: ColorValue }>;
-  } {
+  }> {
     const definitions = this.findVariableDefinitions(document);
     const usages = this.findVariableUsages(document);
-    const colorVariables = this.extractColorsFromVariables(document);
+    const colorVariables = await this.extractColorsFromVariables(document);
 
     // Count usage frequency
     const usageCount = new Map<string, number>();
@@ -952,13 +1047,13 @@ export class VariableResolverImpl implements VariableResolver {
   /**
    * Optimize variable definitions by removing unused variables
    */
-  optimizeVariables(document: vscode.TextDocument): Array<{
+  async optimizeVariables(document: vscode.TextDocument): Promise<Array<{
     action: 'remove' | 'inline' | 'rename';
     variable: VariableDefinition;
     reason: string;
     suggestion?: string;
-  }> {
-    const report = this.generateUsageReport(document);
+  }>> {
+    const report = await this.generateUsageReport(document);
     const optimizations: Array<any> = [];
 
     // Suggest removing unused variables
