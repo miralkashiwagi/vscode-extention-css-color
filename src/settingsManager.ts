@@ -170,13 +170,7 @@ export class SettingsManagerImpl implements SettingsManager {
     return config.get<boolean>('showVariableUsages', true);
   }
 
-  /**
-   * Get whether to show color chips for direct color values
-   */
-  showDirectColors(): boolean {
-    const config = this.getConfiguration();
-    return config.get<boolean>('showDirectColors', true);
-  }
+
 
   /**
    * Get the maximum number of colors to show in multiple color mode
@@ -287,7 +281,6 @@ export class SettingsManagerImpl implements SettingsManager {
       'enabled',
       'showVariableDefinitions',
       'showVariableUsages',
-      'showDirectColors',
       'maxColorsInMultipleMode',
       'enableHoverInfo',
       'enableDebugLogging',
@@ -318,7 +311,6 @@ export class SettingsManagerImpl implements SettingsManager {
       enabled: this.isEnabled(),
       showVariableDefinitions: this.showVariableDefinitions(),
       showVariableUsages: this.showVariableUsages(),
-      showDirectColors: this.showDirectColors(),
       maxColorsInMultipleMode: this.getMaxColorsInMultipleMode(),
       enableHoverInfo: this.enableHoverInfo(),
       enableDebugLogging: this.enableDebugLogging(),

@@ -57,7 +57,6 @@ export interface SettingsManager {
   isEnabled(): boolean;
   showVariableDefinitions(): boolean;
   showVariableUsages(): boolean;
-  showDirectColors(): boolean;
   getMaxColorsInMultipleMode(): number;
   enableHoverInfo(): boolean;
   enableDebugLogging(): boolean;

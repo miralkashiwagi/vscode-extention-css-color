@@ -346,19 +346,7 @@ export class RealtimeUpdater {
       processedRanges.add(key);
     };
 
-    // Process direct color values (highest priority)
-    if (settings.showDirectColors()) {
-      for (const colorMatch of analysisResult.colorMatches || []) {
-        if (!isRangeProcessed(colorMatch.range)) {
-          const decoration = this.decorationProvider.createColorChip(
-            colorMatch.colorValue,
-            colorMatch.range
-          );
-          decorations.push(decoration);
-          markRangeProcessed(colorMatch.range);
-        }
-      }
-    }
+    // Skip direct color values - VS Code handles these natively
 
     // Process variable definitions (medium priority)
     if (settings.showVariableDefinitions()) {

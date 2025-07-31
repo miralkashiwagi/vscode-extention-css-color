@@ -394,7 +394,6 @@ class MockSettingsManager implements SettingsManager {
   isEnabled() { return true; }
   showVariableDefinitions() { return true; }
   showVariableUsages() { return true; }
-  showDirectColors() { return true; }
   getMaxColorsInMultipleMode() { return 5; }
   enableHoverInfo() { return true; }
   enableDebugLogging() { return false; }

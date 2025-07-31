@@ -309,7 +309,7 @@ class MockSettingsManager implements SettingsManager {
   enabled: boolean = true;
   _showVariableDefinitions: boolean = true;
   _showVariableUsages: boolean = true;
-  _showDirectColors: boolean = true;
+
   maxColorsInMultipleMode: number = 5;
   _enableHoverInfo: boolean = true;
   _enableDebugLogging: boolean = false;
@@ -324,7 +324,6 @@ class MockSettingsManager implements SettingsManager {
   isEnabled() { return this.enabled; }
   showVariableDefinitions() { return this._showVariableDefinitions; }
   showVariableUsages() { return this._showVariableUsages; }
-  showDirectColors() { return this._showDirectColors; }
   getMaxColorsInMultipleMode() { return this.maxColorsInMultipleMode; }
   enableHoverInfo() { return this._enableHoverInfo; }
   enableDebugLogging() { return this._enableDebugLogging; }
