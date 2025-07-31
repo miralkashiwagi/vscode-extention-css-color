@@ -41,7 +41,7 @@ export interface DecorationProvider {
   createMultipleColorChips(colors: ColorValue[], range: vscode.Range, context?: string): vscode.DecorationOptions;
   createCompactMultipleChips(colors: ColorValue[], baseRange: vscode.Range, spacing?: number): vscode.DecorationOptions[];
   createStackedColorChips(colors: ColorValue[], range: vscode.Range, maxVisible?: number): vscode.DecorationOptions;
-  createUndefinedVariableDecoration(variableName: string, range: vscode.Range, fallbackColor?: ColorValue): vscode.DecorationOptions;
+
   applyDecorations(editor: vscode.TextEditor, decorations: vscode.DecorationOptions[]): void;
   clearDecorations(editor: vscode.TextEditor): void;
   updateDecorationStyles(): void;

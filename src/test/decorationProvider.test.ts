@@ -191,42 +191,7 @@ suite('DecorationProvider Tests', () => {
     });
   });
 
-  suite('Undefined Variable Decoration', () => {
-    test('should create decoration for undefined variable', () => {
-      const range = new vscode.Range(0, 0, 0, 15);
 
-      const decoration = provider.createUndefinedVariableDecoration('--undefined-var', range);
-
-      assert.strictEqual(decoration.range, range);
-      assert.strictEqual(decoration.renderOptions?.before?.contentText, '?');
-      assert.ok(decoration.renderOptions?.before?.border?.includes('dashed'));
-      assert.ok(decoration.renderOptions?.before?.border?.includes('rgba(255, 0, 0, 0.5)'));
-
-      const hoverMessage = decoration.hoverMessage as vscode.MarkdownString;
-      assert.ok(hoverMessage.value.includes('Undefined Variable'));
-      assert.ok(hoverMessage.value.includes('--undefined-var'));
-      assert.ok(hoverMessage.value.includes('Suggestions'));
-    });
-
-    test('should include fallback color when provided', () => {
-      const fallbackColor: ColorValue = {
-        hex: '#cccccc',
-        rgb: { r: 204, g: 204, b: 204 },
-        hsl: { h: 0, s: 0, l: 80 },
-        original: '#cccccc',
-        isValid: true
-      };
-      const range = new vscode.Range(0, 0, 0, 15);
-
-      const decoration = provider.createUndefinedVariableDecoration('$undefined-var', range, fallbackColor);
-
-      assert.strictEqual(decoration.renderOptions?.before?.backgroundColor, '#cccccc');
-
-      const hoverMessage = decoration.hoverMessage as vscode.MarkdownString;
-      assert.ok(hoverMessage.value.includes('Fallback Color'));
-      assert.ok(hoverMessage.value.includes('#cccccc'));
-    });
-  });
 
   suite('Decoration Application and Management', () => {
     test('should apply decorations to editor', () => {

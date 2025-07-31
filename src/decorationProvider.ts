@@ -12,7 +12,7 @@ export class DecorationProviderImpl implements DecorationProvider {
   createColorChip(color: ColorValue, range: vscode.Range): vscode.DecorationOptions {
     const chipSize = this.getChipSize();
     const chipStyle = this.createChipStyle(color, chipSize);
-    
+
     return {
       range,
       renderOptions: {
@@ -39,7 +39,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     }
 
     const editorId = editor.document.uri.toString();
-    
+
     // Always clear existing decorations for this editor first
     this.clearDecorations(editor);
 
@@ -58,7 +58,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     decorationGroups.forEach((decorationOptions, colorKey) => {
       const decorationType = this.getOrCreateDecorationType(colorKey, decorationOptions[0]);
       newDecorationTypes.push(decorationType);
-      
+
       // Apply decorations of this color
       editor.setDecorations(decorationType, decorationOptions);
     });
@@ -161,7 +161,7 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     // Calculate luminance
     const luminance = 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
-    
+
     return luminance > 0.7; // Threshold for "light" color
   }
 
@@ -174,7 +174,7 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     // Color preview
     const colorPreview = `<div style="width: 50px; height: 20px; background-color: ${color.hex}; border: 1px solid #ccc; display: inline-block; margin-right: 10px;"></div>`;
-    
+
     // Color information
     const colorInfo = [
       `**Original:** \`${color.original}\``,
@@ -184,7 +184,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     ].join('\n\n');
 
     markdown.appendMarkdown(`${colorPreview}\n\n${colorInfo}`);
-    
+
     return markdown;
   }
 
@@ -237,7 +237,7 @@ export class DecorationProviderImpl implements DecorationProvider {
   ): vscode.DecorationOptions {
     const chipSize = this.getChipSize();
     const chipStyle = this.createChipStyle(resolvedColor, chipSize);
-    
+
     // Create compound decoration for variable with fallback
     const decoration: vscode.DecorationOptions = {
       range,
@@ -291,7 +291,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     }
 
     markdown.appendMarkdown(colorInfo.join('\n'));
-    
+
     return markdown;
   }
 
@@ -313,7 +313,7 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     const chipSize = this.getChipSize();
     const chipStyle = this.createChipStyle(colors[0], chipSize);
-    
+
     // Create gradient background for multiple colors
     const gradientColors = colors.map(color => color.hex).join(', ');
     const gradient = `linear-gradient(90deg, ${gradientColors})`;
@@ -358,36 +358,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     return markdown;
   }
 
-  /**
-   * Create decoration for undefined variable
-   */
-  createUndefinedVariableDecoration(
-    variableName: string,
-    range: vscode.Range,
-    fallbackColor?: ColorValue
-  ): vscode.DecorationOptions {
-    const chipSize = this.getChipSize();
-    const chipStyle = this.createChipStyle(fallbackColor || { hex: '#cccccc', rgb: { r: 204, g: 204, b: 204 }, hsl: { h: 0, s: 0, l: 80 }, original: '#cccccc', isValid: true }, chipSize);
-    
-    const decoration: vscode.DecorationOptions = {
-      range,
-      renderOptions: {
-        before: {
-          contentText: '?',
-          backgroundColor: fallbackColor?.hex || '#cccccc',
-          color: '#666666',
-          border: '1px dashed rgba(255, 0, 0, 0.5)',
-          width: chipStyle.width,
-          height: chipStyle.height,
-          margin: chipStyle.margin,
-          textDecoration: 'none; display: inline-block; vertical-align: middle; text-align: center; font-size: 8px;'
-        }
-      },
-      hoverMessage: this.createUndefinedVariableHoverMessage(variableName, fallbackColor)
-    };
 
-    return decoration;
-  }
 
   /**
    * Resolve overlapping decorations to prevent visual conflicts
@@ -404,7 +375,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     const sortedDecorations = [...uniqueDecorations].sort((a, b) => {
       const aStart = a.range.start;
       const bStart = b.range.start;
-      
+
       if (aStart.line !== bStart.line) {
         return aStart.line - bStart.line;
       }
@@ -416,14 +387,14 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     for (const decoration of sortedDecorations) {
       const positionKey = `${decoration.range.start.line}:${decoration.range.start.character}`;
-      
+
       // Skip if we already have a decoration at this exact position
       if (usedPositions.has(positionKey)) {
         continue;
       }
 
       // Check for overlap with nearby decorations
-      const hasOverlap = resolvedDecorations.some(existing => 
+      const hasOverlap = resolvedDecorations.some(existing =>
         this.decorationsOverlap(existing, decoration)
       );
 
@@ -478,15 +449,15 @@ export class DecorationProviderImpl implements DecorationProvider {
     // Same line - check character overlap with chip width consideration
     const chipSize = this.getChipSize();
     const chipWidth = this.getChipWidthInCharacters(chipSize);
-    
+
     const start1 = range1.start.character;
     const end1 = range1.end.character;
     const start2 = range2.start.character;
     const end2 = range2.end.character;
 
     // Consider chip visual width when checking overlap
-    return Math.abs(start1 - start2) < chipWidth || 
-           (start1 <= end2 + chipWidth && end1 + chipWidth >= start2);
+    return Math.abs(start1 - start2) < chipWidth ||
+      (start1 <= end2 + chipWidth && end1 + chipWidth >= start2);
   }
 
   /**
@@ -524,7 +495,7 @@ export class DecorationProviderImpl implements DecorationProvider {
   ): vscode.DecorationOptions {
     const chipSize = this.getChipSize();
     const chipWidth = this.getChipWidthInCharacters(chipSize);
-    
+
     // Calculate new position with spacing
     const newStartCharacter = lastEndPosition.character + chipWidth + 1; // +1 for spacing
     const newRange = new vscode.Range(
@@ -570,7 +541,7 @@ export class DecorationProviderImpl implements DecorationProvider {
       );
 
       const decoration = this.createColorChip(color, chipRange);
-      
+
       // Add index indicator for multiple chips
       if (decoration.renderOptions?.before) {
         decoration.renderOptions.before.contentText = `${index + 1}`;
@@ -628,11 +599,11 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     const chipSize = this.getChipSize();
     const chipStyle = this.createChipStyle(colors[0], chipSize);
-    
+
     // Show primary color with indicator for additional colors
     const visibleColors = colors.slice(0, maxVisible);
     const hiddenCount = Math.max(0, colors.length - maxVisible);
-    
+
     const decoration: vscode.DecorationOptions = {
       range,
       renderOptions: {
@@ -682,29 +653,5 @@ export class DecorationProviderImpl implements DecorationProvider {
     return markdown;
   }
 
-  /**
-   * Create hover message for undefined variable
-   */
-  private createUndefinedVariableHoverMessage(
-    variableName: string,
-    fallbackColor?: ColorValue
-  ): vscode.MarkdownString {
-    const markdown = new vscode.MarkdownString();
-    markdown.isTrusted = true;
 
-    markdown.appendMarkdown(`**⚠️ Undefined Variable**\n\n`);
-    markdown.appendMarkdown(`Variable \`${variableName}\` is not defined in the current scope.\n\n`);
-
-    if (fallbackColor) {
-      const colorPreview = `<div style="width: 30px; height: 15px; background-color: ${fallbackColor.hex}; border: 1px solid #ccc; display: inline-block; margin-right: 5px;"></div>`;
-      markdown.appendMarkdown(`**Fallback Color:** ${colorPreview} \`${fallbackColor.hex}\`\n\n`);
-    }
-
-    markdown.appendMarkdown(`**Suggestions:**\n`);
-    markdown.appendMarkdown(`- Define the variable in the current file or an imported file\n`);
-    markdown.appendMarkdown(`- Check for typos in the variable name\n`);
-    markdown.appendMarkdown(`- Ensure the variable is in scope\n`);
-
-    return markdown;
-  }
 }

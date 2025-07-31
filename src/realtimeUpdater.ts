@@ -418,27 +418,8 @@ export class RealtimeUpdater {
               decorations.push(decoration);
             }
             markRangeProcessed(varUsage.range);
-          } else if (varUsage.fallbackValue) {
-            // Show undefined variable with fallback
-            const fallbackColor = await this.resolveColorValue(varUsage.fallbackValue);
-            if (fallbackColor) {
-              const decoration = this.decorationProvider.createUndefinedVariableDecoration(
-                varUsage.name,
-                varUsage.range,
-                fallbackColor
-              );
-              decorations.push(decoration);
-              markRangeProcessed(varUsage.range);
-            }
-          } else {
-            // Show undefined variable
-            const decoration = this.decorationProvider.createUndefinedVariableDecoration(
-              varUsage.name,
-              varUsage.range
-            );
-            decorations.push(decoration);
-            markRangeProcessed(varUsage.range);
           }
+          // If colorValue is null (variable is not a color or undefined), don't show anything
         }
       }
     }

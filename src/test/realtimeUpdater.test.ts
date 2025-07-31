@@ -249,7 +249,7 @@ suite('RealtimeUpdater Tests', () => {
       assert.ok(mockDecorationProvider.createVariableColorChipCalled);
     });
 
-    test('should create decorations for undefined variables', async () => {
+    test('should not show decorations for undefined or non-color variables', async () => {
       const document = createMockDocument('test.css', 'css');
       const analysisResult = {
         colorMatches: [],
@@ -263,12 +263,12 @@ suite('RealtimeUpdater Tests', () => {
       };
 
       mockSettingsManager._showVariableUsages = true;
-      mockDynamicModeHandler.mockResolveResult = null; // Undefined variable
+      mockDynamicModeHandler.mockResolveResult = null; // Undefined or non-color variable
 
       const decorations = await (realtimeUpdater as any).createDecorations(document, analysisResult);
 
-      assert.strictEqual(decorations.length, 1);
-      assert.ok(mockDecorationProvider.createUndefinedVariableDecorationCalled);
+      // Should not create any decorations for undefined or non-color variables
+      assert.strictEqual(decorations.length, 0);
     });
   });
 
@@ -327,7 +327,7 @@ class MockFileWatcher implements FileWatcher {
 class MockDecorationProvider implements DecorationProvider {
   createColorChipCalled = false;
   createVariableColorChipCalled = false;
-  createUndefinedVariableDecorationCalled = false;
+
   applyDecorationsCalled = false;
   updateDecorationStylesCalled = false;
 
@@ -353,10 +353,7 @@ class MockDecorationProvider implements DecorationProvider {
     return { range: new vscode.Range(0, 0, 0, 0) };
   }
 
-  createUndefinedVariableDecoration(): vscode.DecorationOptions {
-    this.createUndefinedVariableDecorationCalled = true;
-    return { range: new vscode.Range(0, 0, 0, 0) };
-  }
+
 
   applyDecorations(): void {
     this.applyDecorationsCalled = true;
