@@ -639,7 +639,7 @@ export class VariableResolverImpl implements VariableResolver {
   }
 
   /**
-   * Resolve variable from workspace-wide search
+   * Resolve variable from workspace-wide search with performance optimization
    */
   private async resolveFromWorkspace(
     variableName: string,
@@ -651,53 +651,77 @@ export class VariableResolverImpl implements VariableResolver {
         return null;
       }
 
-      // Search for SCSS/CSS files in workspace
+      // Limit workspace search to improve performance
+      const MAX_FILES_TO_SEARCH = 50;
+      const SEARCH_TIMEOUT_MS = 2000; // 2 seconds timeout
+
+      // Search for SCSS/CSS files in workspace with exclusions for better performance
       const filePattern = new vscode.RelativePattern(workspaceFolder, '**/*.{scss,sass,css}');
-      const files = await vscode.workspace.findFiles(filePattern, '**/node_modules/**');
+      const excludePattern = '**/node_modules/**';
+      
+      const searchPromise = vscode.workspace.findFiles(filePattern, excludePattern, MAX_FILES_TO_SEARCH);
+      const files = await Promise.race([
+        searchPromise,
+        new Promise<vscode.Uri[]>((_, reject) => 
+          setTimeout(() => reject(new Error('Workspace search timeout')), SEARCH_TIMEOUT_MS)
+        )
+      ]);
 
-      // Search each file for the variable definition
-      for (const fileUri of files) {
-        // Skip current document as it was already checked
-        if (fileUri.toString() === currentDocument.uri.toString()) {
-          continue;
-        }
+      // Process files in batches to avoid blocking
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < files.length; i += BATCH_SIZE) {
+        const batch = files.slice(i, i + BATCH_SIZE);
+        
+        for (const fileUri of batch) {
+          // Skip current document as it was already checked
+          if (fileUri.toString() === currentDocument.uri.toString()) {
+            continue;
+          }
 
-        try {
-          const document = await vscode.workspace.openTextDocument(fileUri);
-          const text = document.getText();
-          
-          // Check if this file contains the variable definition
-          if (document.languageId === 'scss' || document.languageId === 'sass') {
-            const resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
-            if (resolvedValue) {
-              const colorValue = ColorValueImpl.fromString(resolvedValue);
-              if (colorValue.isValid) {
-                return colorValue;
-              }
+          try {
+            const document = await vscode.workspace.openTextDocument(fileUri);
+            const text = document.getText();
+            
+            // Skip very large files to avoid performance issues
+            if (text.length > 100000) { // 100KB limit
+              continue;
             }
-          } else if (document.languageId === 'css') {
-            // Also check CSS files for CSS custom properties
-            if (variableName.startsWith('--')) {
-              const definitions = this.cssParser.findVariableDefinitions(text);
-              const definition = definitions.find(def => def.name === variableName);
-              if (definition) {
-                const colorValue = ColorValueImpl.fromString(definition.value);
+            
+            // Check if this file contains the variable definition
+            if (document.languageId === 'scss' || document.languageId === 'sass') {
+              const resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
+              if (resolvedValue) {
+                const colorValue = ColorValueImpl.fromString(resolvedValue);
                 if (colorValue.isValid) {
                   return colorValue;
                 }
               }
+            } else if (document.languageId === 'css') {
+              // Also check CSS files for CSS custom properties
+              if (variableName.startsWith('--')) {
+                const definitions = this.cssParser.findVariableDefinitions(text);
+                const definition = definitions.find(def => def.name === variableName);
+                if (definition) {
+                  const colorValue = ColorValueImpl.fromString(definition.value);
+                  if (colorValue.isValid) {
+                    return colorValue;
+                  }
+                }
+              }
             }
+          } catch (error) {
+            // Skip files that can't be opened or parsed
+            continue;
           }
-        } catch (error) {
-          // Skip files that can't be opened or parsed
-          console.warn(`Failed to search variable in file: ${fileUri.toString()}`, error);
-          continue;
         }
+
+        // Yield control to prevent blocking the UI
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
 
       return null;
     } catch (error) {
-      console.warn(`Workspace-wide variable search failed for ${variableName}:`, error);
+      // Silently fail for performance reasons
       return null;
     }
   }

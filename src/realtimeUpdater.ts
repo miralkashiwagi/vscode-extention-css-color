@@ -266,7 +266,7 @@ export class RealtimeUpdater {
   }
 
   /**
-   * Schedule debounced update for editor
+   * Schedule debounced update for editor with adaptive delay
    */
   private scheduleUpdate(
     editor: vscode.TextEditor,
@@ -286,8 +286,16 @@ export class RealtimeUpdater {
       return;
     }
 
-    // Schedule new update
-    const delay = customDelay || this.settingsManager.getDebounceDelay();
+    // Adaptive delay based on file size
+    let delay = customDelay || this.settingsManager.getDebounceDelay();
+    const fileSize = editor.document.getText().length;
+    
+    if (fileSize > 50000) { // 50KB
+      delay = Math.max(delay * 2, 1000); // At least 1 second for large files
+    } else if (fileSize > 20000) { // 20KB
+      delay = Math.max(delay * 1.5, 600); // 600ms for medium files
+    }
+
     const timer = setTimeout(() => {
       this.updateTimers.delete(editorId);
       this.updateEditor(editor, false);
@@ -297,11 +305,18 @@ export class RealtimeUpdater {
   }
 
   /**
-   * Update editor with color chips
+   * Update editor with color chips using progressive rendering
    */
   private async updateEditor(editor: vscode.TextEditor, immediate: boolean): Promise<void> {
     try {
       const document = editor.document;
+      const fileSize = document.getText().length;
+      
+      // For large files, use progressive rendering
+      if (fileSize > 30000 && !immediate) { // 30KB threshold
+        await this.updateEditorProgressively(editor);
+        return;
+      }
       
       // Get analysis result
       const visibleRanges = [...editor.visibleRanges];
@@ -319,6 +334,49 @@ export class RealtimeUpdater {
     } catch (error) {
       if (this.settingsManager.enableDebugLogging()) {
         console.error(`Failed to update editor ${editor.document.uri.toString()}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Progressive rendering for large files
+   */
+  private async updateEditorProgressively(editor: vscode.TextEditor): Promise<void> {
+    try {
+      const document = editor.document;
+      const visibleRanges = [...editor.visibleRanges];
+      
+      // Step 1: Analyze and render visible area first
+      const visibleAnalysisResult = this.incrementalAnalyzer.analyzeVisibleRegions(document, visibleRanges);
+      const visibleDecorations = await this.createDecorations(document, visibleAnalysisResult);
+      this.decorationProvider.applyDecorations(editor, visibleDecorations);
+      
+      // Step 2: Schedule background analysis for the rest of the file
+      setTimeout(async () => {
+        try {
+          // Check if editor is still active
+          if (editor.document.isClosed || 
+              !vscode.window.visibleTextEditors.includes(editor)) {
+            return;
+          }
+          
+          // Analyze full document in background
+          const fullAnalysisResult = this.incrementalAnalyzer.analyzeVisibleRegions(
+            document, 
+            [new vscode.Range(0, 0, document.lineCount - 1, 0)]
+          );
+          
+          const fullDecorations = await this.createDecorations(document, fullAnalysisResult);
+          this.decorationProvider.applyDecorations(editor, fullDecorations);
+          
+        } catch (error) {
+          // Silently fail background processing
+        }
+      }, 100); // Small delay to not block UI
+      
+    } catch (error) {
+      if (this.settingsManager.enableDebugLogging()) {
+        console.error(`Failed to update editor progressively ${editor.document.uri.toString()}:`, error);
       }
     }
   }
@@ -416,7 +474,7 @@ export class RealtimeUpdater {
   }
 
   /**
-   * Resolve variable color using dynamic mode handler
+   * Resolve variable color using dynamic mode handler with timeout
    */
   private async resolveVariableColor(
     variableName: string,
@@ -424,36 +482,55 @@ export class RealtimeUpdater {
     document: vscode.TextDocument
   ): Promise<ColorValue | ColorValue[] | null> {
     try {
-      // First resolve the default value if provided
-      let defaultColorValue: ColorValue | null = null;
-      if (defaultValue) {
-        defaultColorValue = await this.resolveColorValue(defaultValue);
-      }
-
-      // If no default color value, try to resolve from variable resolver
-      if (!defaultColorValue) {
-        if (variableName.startsWith('--')) {
-          defaultColorValue = await this.variableResolver.resolveCSSVariable(variableName, document);
-        } else if (variableName.startsWith('$')) {
-          // Use async resolution for SCSS variables to support workspace-wide search
-          defaultColorValue = await this.variableResolver.resolveSCSSVariable(variableName, document);
-        }
-      }
-
-      // Use dynamic mode handler to get final color(s)
-      const result = this.dynamicModeHandler.resolveVariableColor(
-        variableName,
-        defaultColorValue,
-        document
+      // Add timeout to prevent long-running variable resolution
+      const VARIABLE_RESOLUTION_TIMEOUT = 1000; // 1 second
+      
+      const resolutionPromise = this.resolveVariableColorInternal(variableName, defaultValue, document);
+      const timeoutPromise = new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('Variable resolution timeout')), VARIABLE_RESOLUTION_TIMEOUT)
       );
-
-      return result;
+      
+      return await Promise.race([resolutionPromise, timeoutPromise]);
     } catch (error) {
       if (this.settingsManager.enableDebugLogging()) {
         console.warn(`Failed to resolve variable color ${variableName}:`, error);
       }
       return null;
     }
+  }
+
+  /**
+   * Internal variable color resolution
+   */
+  private async resolveVariableColorInternal(
+    variableName: string,
+    defaultValue: string | null,
+    document: vscode.TextDocument
+  ): Promise<ColorValue | ColorValue[] | null> {
+    // First resolve the default value if provided
+    let defaultColorValue: ColorValue | null = null;
+    if (defaultValue) {
+      defaultColorValue = await this.resolveColorValue(defaultValue);
+    }
+
+    // If no default color value, try to resolve from variable resolver
+    if (!defaultColorValue) {
+      if (variableName.startsWith('--')) {
+        defaultColorValue = await this.variableResolver.resolveCSSVariable(variableName, document);
+      } else if (variableName.startsWith('$')) {
+        // Use async resolution for SCSS variables to support workspace-wide search
+        defaultColorValue = await this.variableResolver.resolveSCSSVariable(variableName, document);
+      }
+    }
+
+    // Use dynamic mode handler to get final color(s)
+    const result = this.dynamicModeHandler.resolveVariableColor(
+      variableName,
+      defaultColorValue,
+      document
+    );
+
+    return result;
   }
 
   /**
