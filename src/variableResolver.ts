@@ -17,9 +17,13 @@ export class VariableResolverImpl implements VariableResolver {
   private cssParser: CSSParser;
   private scssParser: SCSSParser;
   private variableCache: Map<string, VariableContext> = new Map();
+  private workspaceVariableCache: Map<string, ColorValue | null> = new Map();
+  private workspaceFilesCache: vscode.Uri[] | null = null;
+  private workspaceCacheTimestamp: number = 0;
   private errorHandler: ErrorHandler;
   private readonly RESOLUTION_TIMEOUT_MS = 5000; // 5 seconds timeout
   private readonly MAX_RESOLUTION_DEPTH = 10; // Prevent infinite recursion
+  private readonly WORKSPACE_CACHE_TTL = 30000; // 30 seconds cache TTL
 
   constructor(errorHandler: ErrorHandler) {
     this.cssParser = new CSSParser();
@@ -125,31 +129,30 @@ export class VariableResolverImpl implements VariableResolver {
       const text = document.getText();
       let resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
       
-      // If not found in current file, try to resolve from imports
-      if (!resolvedValue) {
-        const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-        const importResult = await this.resolveFromSCSSImports(variableName, document, workspaceFolder);
-        if (importResult) {
-          return importResult;
+      // If found in current file, try to parse as color immediately
+      if (resolvedValue) {
+        const colorValue = ColorValueImpl.fromString(resolvedValue);
+        if (colorValue.isValid) {
+          return colorValue;
         }
-
-        // If still not found, try workspace-wide search
-        const workspaceResult = await this.resolveFromWorkspace(variableName, document);
-        if (workspaceResult) {
-          return workspaceResult;
-        }
-
-        // Variable not found - this is normal, just return null
+        // Variable value is not a color - this is normal, just return null
         return null;
       }
 
-      // Try to parse the resolved value as a color
-      const colorValue = ColorValueImpl.fromString(resolvedValue);
-      if (colorValue.isValid) {
-        return colorValue;
+      // If not found in current file, try to resolve from imports first (faster than workspace search)
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+      const importResult = await this.resolveFromSCSSImports(variableName, document, workspaceFolder);
+      if (importResult) {
+        return importResult;
       }
 
-      // Variable value is not a color - this is normal, just return null
+      // Only do workspace search as last resort
+      const workspaceResult = await this.resolveFromWorkspace(variableName, document);
+      if (workspaceResult) {
+        return workspaceResult;
+      }
+
+      // Variable not found - this is normal, just return null
       return null;
     } catch (error) {
       if (error instanceof VariableResolutionError) {
@@ -496,6 +499,9 @@ export class VariableResolverImpl implements VariableResolver {
    */
   clearCache(): void {
     this.variableCache.clear();
+    this.workspaceVariableCache.clear();
+    this.workspaceFilesCache = null;
+    this.workspaceCacheTimestamp = 0;
   }
 
   /**
@@ -657,30 +663,26 @@ export class VariableResolverImpl implements VariableResolver {
     variableName: string,
     currentDocument: vscode.TextDocument
   ): Promise<ColorValue | null> {
+    // Define cache key outside try block so it's accessible in catch
+    const cacheKey = `${variableName}:${currentDocument.uri.toString()}`;
+    
     try {
-      // Only log for debugging when needed
-      // console.log(`[Variable Resolver] Starting workspace search for variable: ${variableName}`);
+      // Check cache first
+      if (this.workspaceVariableCache.has(cacheKey)) {
+        return this.workspaceVariableCache.get(cacheKey) || null;
+      }
       
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(currentDocument.uri);
       if (!workspaceFolder) {
         return null;
       }
 
-      // Limit workspace search to improve performance
-      const MAX_FILES_TO_SEARCH = 50;
-      const SEARCH_TIMEOUT_MS = 2000; // 2 seconds timeout
-
-      // Search for SCSS/CSS files in workspace with exclusions for better performance
-      const filePattern = new vscode.RelativePattern(workspaceFolder, '**/*.{scss,sass,css}');
-      const excludePattern = '**/node_modules/**';
-      
-      const searchPromise = vscode.workspace.findFiles(filePattern, excludePattern, MAX_FILES_TO_SEARCH);
-      const files = await Promise.race([
-        searchPromise,
-        new Promise<vscode.Uri[]>((_, reject) => 
-          setTimeout(() => reject(new Error('Workspace search timeout')), SEARCH_TIMEOUT_MS)
-        )
-      ]);
+      // Get cached file list or search for new files
+      const files = await this.getWorkspaceFiles(workspaceFolder);
+      if (!files || files.length === 0) {
+        this.workspaceVariableCache.set(cacheKey, null);
+        return null;
+      }
 
       // Process files in batches to avoid blocking
       const BATCH_SIZE = 10;
@@ -711,6 +713,8 @@ export class VariableResolverImpl implements VariableResolver {
                   // console.log(`[Variable Resolver] ✓ Found SCSS variable ${variableName} in ${fileUri.fsPath}: ${resolvedValue}`);
                   const colorValue = ColorValueImpl.fromString(resolvedValue);
                   if (colorValue.isValid) {
+                    // Cache the successful result
+                    this.workspaceVariableCache.set(cacheKey, colorValue);
                     return colorValue;
                   }
                 }
@@ -724,6 +728,8 @@ export class VariableResolverImpl implements VariableResolver {
                   // console.log(`[Variable Resolver] ✓ Found CSS variable ${variableName} in SCSS file ${fileUri.fsPath}: ${definition.value}`);
                   const colorValue = ColorValueImpl.fromString(definition.value);
                   if (colorValue.isValid) {
+                    // Cache the successful result
+                    this.workspaceVariableCache.set(cacheKey, colorValue);
                     return colorValue;
                   }
                 }
@@ -737,6 +743,8 @@ export class VariableResolverImpl implements VariableResolver {
                   // console.log(`[Variable Resolver] ✓ Found CSS variable ${variableName} in CSS file ${fileUri.fsPath}: ${definition.value}`);
                   const colorValue = ColorValueImpl.fromString(definition.value);
                   if (colorValue.isValid) {
+                    // Cache the successful result
+                    this.workspaceVariableCache.set(cacheKey, colorValue);
                     return colorValue;
                   }
                 }
@@ -752,13 +760,52 @@ export class VariableResolverImpl implements VariableResolver {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
-      // Only log when variable is not found in debug mode
-      // console.log(`[Variable Resolver] Workspace search completed for ${variableName} - variable not found`);
+      // Cache the negative result
+      this.workspaceVariableCache.set(cacheKey, null);
       return null;
     } catch (error) {
-      // Only log errors in debug mode
-      // console.log(`[Variable Resolver] Workspace search failed for ${variableName}:`, error);
+      // Cache the error result as null
+      this.workspaceVariableCache.set(cacheKey, null);
       return null;
+    }
+  }
+
+  /**
+   * Get workspace files with caching
+   */
+  private async getWorkspaceFiles(workspaceFolder: vscode.WorkspaceFolder): Promise<vscode.Uri[]> {
+    const now = Date.now();
+    
+    // Return cached files if still valid
+    if (this.workspaceFilesCache && (now - this.workspaceCacheTimestamp) < this.WORKSPACE_CACHE_TTL) {
+      return this.workspaceFilesCache;
+    }
+
+    try {
+      // Limit workspace search to improve performance
+      const MAX_FILES_TO_SEARCH = 50;
+      const SEARCH_TIMEOUT_MS = 2000; // 2 seconds timeout
+
+      // Search for SCSS/CSS files in workspace with exclusions for better performance
+      const filePattern = new vscode.RelativePattern(workspaceFolder, '**/*.{scss,sass,css}');
+      const excludePattern = '**/node_modules/**';
+      
+      const searchPromise = vscode.workspace.findFiles(filePattern, excludePattern, MAX_FILES_TO_SEARCH);
+      const files = await Promise.race([
+        searchPromise,
+        new Promise<vscode.Uri[]>((_, reject) => 
+          setTimeout(() => reject(new Error('Workspace search timeout')), SEARCH_TIMEOUT_MS)
+        )
+      ]);
+
+      // Cache the results
+      this.workspaceFilesCache = files;
+      this.workspaceCacheTimestamp = now;
+      
+      return files;
+    } catch (error) {
+      // Return empty array on error
+      return [];
     }
   }
 
