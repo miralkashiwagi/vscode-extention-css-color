@@ -62,7 +62,7 @@ export class SettingsManagerImpl implements SettingsManager {
   getEnabledFileTypes(): string[] {
     return safeExecuteSync(
       () => this.getEnabledFileTypesInternal(),
-      ['css', 'scss', 'sass', 'less'],
+      ['css', 'scss', 'sass'],
       this.errorHandler,
       'getEnabledFileTypes'
     );
@@ -73,7 +73,7 @@ export class SettingsManagerImpl implements SettingsManager {
    */
   private getEnabledFileTypesInternal(): string[] {
     const config = this.getConfiguration();
-    const fileTypes = config.get<string[]>('enabledFileTypes', ['css', 'scss', 'sass', 'less']);
+    const fileTypes = config.get<string[]>('enabledFileTypes', ['css', 'scss', 'sass']);
     
     if (!Array.isArray(fileTypes)) {
       throw new SettingsValidationError(

@@ -1,21 +1,32 @@
 {
-  "name": "color-visualizer",
-  "displayName": "Color visualizer",
+  "name": "css-variable-color-chips",
+  "displayName": "CSS Variable Color Chips",
   "publisher": "miral-kashiwagi",
   "categories": [
-    "Programming Languages",
-    "Other"
+    "Programming Languages"
   ],
-  "description": "Display color chips for CSS custom properties and SCSS variables",
+  "keywords": [
+    "css",
+    "scss",
+    "sass",
+    "color",
+    "variable",
+    "visualization"
+  ],
+  "description": "Display color chips for CSS custom properties and SCSS variables with advanced workspace-wide variable resolution",
   "version": "0.0.1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miralkashiwagi/vscode-extention-css-color"
+  },
   "engines": {
     "vscode": "^1.99.0"
   },
   "activationEvents": [
     "onLanguage:css",
     "onLanguage:scss",
-    "onLanguage:sass",
-    "onLanguage:less"
+    "onLanguage:sass"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -50,8 +61,7 @@
           "default": [
             "css",
             "scss",
-            "sass",
-            "less"
+            "sass"
           ],
           "description": "File types where color chips should be displayed"
         },
@@ -162,5 +172,8 @@
     "eslint": "^9.25.1",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "tinycolor2": "^1.6.0"
   }
 }

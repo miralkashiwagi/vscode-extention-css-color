@@ -259,14 +259,13 @@ suite('FileWatcher Tests', () => {
     });
 
     test('should return watched patterns', () => {
-      mockSettingsManager.enabledFileTypes = ['css', 'scss', 'less'];
+      mockSettingsManager.enabledFileTypes = ['css', 'scss'];
 
       const patterns = fileWatcher.getWatchedPatterns();
 
       assert.deepStrictEqual(patterns, [
         '**/*.css',
-        '**/*.scss',
-        '**/*.less'
+        '**/*.scss'
       ]);
     });
   });
