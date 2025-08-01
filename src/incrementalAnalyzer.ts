@@ -26,6 +26,9 @@ export class IncrementalAnalyzer {
   private analysisCache: Map<string, AnalysisResult> = new Map();
   private pendingAnalysis: Map<string, AnalysisRegion[]> = new Map();
   private analysisInProgress: Set<string> = new Set();
+  
+  // Analysis configuration constants
+  private readonly BACKGROUND_PROCESS_DELAY = 100; // Small delay to not block UI
 
   constructor(
     private cssParser: Parser,
@@ -297,7 +300,7 @@ export class IncrementalAnalyzer {
       // Schedule background analysis
       setTimeout(() => {
         this.processBackgroundAnalysis(document, remainingRegions);
-      }, 100); // Small delay to not block UI
+      }, this.BACKGROUND_PROCESS_DELAY);
     }
   }
 

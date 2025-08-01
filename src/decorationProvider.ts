@@ -5,6 +5,12 @@ import { ColorValue, ChipSize } from './types';
 export class DecorationProviderImpl implements DecorationProvider {
   private decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
   private activeDecorations: Map<string, vscode.TextEditorDecorationType[]> = new Map();
+  
+  // Color and styling constants
+  private readonly LIGHT_COLOR_THRESHOLD = 0.7; // Threshold for "light" color
+  private readonly LUMINANCE_RED_FACTOR = 0.2126;
+  private readonly LUMINANCE_GREEN_FACTOR = 0.7152;
+  private readonly LUMINANCE_BLUE_FACTOR = 0.0722;
 
   /**
    * Create a color chip decoration for a given color and range
@@ -158,9 +164,9 @@ export class DecorationProviderImpl implements DecorationProvider {
     const bLinear = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
 
     // Calculate luminance
-    const luminance = 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+    const luminance = this.LUMINANCE_RED_FACTOR * rLinear + this.LUMINANCE_GREEN_FACTOR * gLinear + this.LUMINANCE_BLUE_FACTOR * bLinear;
 
-    return luminance > 0.7; // Threshold for "light" color
+    return luminance > this.LIGHT_COLOR_THRESHOLD;
   }
 
   /**

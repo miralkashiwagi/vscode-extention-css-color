@@ -18,6 +18,18 @@ export class RealtimeUpdater {
   private updateTimers: Map<string, NodeJS.Timeout> = new Map();
   private isActive = false;
   private visibleEditorsCache: Map<string, vscode.TextEditor> = new Map();
+  
+  // Update timing constants
+  private readonly ACTIVE_EDITOR_DELAY = 100; // Shorter delay for active editor
+  private readonly SCROLL_EVENT_DELAY = 800; // 800ms delay for scroll
+  private readonly MIN_TYPING_DELAY = 500; // Minimum 500ms to reduce flicker
+  private readonly LARGE_FILE_THRESHOLD = 50000; // 50KB
+  private readonly MEDIUM_FILE_THRESHOLD = 20000; // 20KB
+  private readonly PROGRESSIVE_RENDER_THRESHOLD = 30000; // 30KB threshold
+  private readonly LARGE_FILE_DELAY = 1000; // At least 1 second for large files
+  private readonly MEDIUM_FILE_DELAY = 800; // 800ms for medium files
+  private readonly BACKGROUND_PROCESS_DELAY = 100; // Small delay to not block UI
+  private readonly VARIABLE_RESOLUTION_TIMEOUT = 1000; // 1 second
 
   constructor(
     private fileWatcher: FileWatcher,
@@ -208,7 +220,7 @@ export class RealtimeUpdater {
     }
 
     // Update active editor with higher priority
-    this.scheduleUpdate(editor, false, 100); // Shorter delay for active editor
+    this.scheduleUpdate(editor, false, this.ACTIVE_EDITOR_DELAY);
   }
 
   /**
@@ -224,7 +236,7 @@ export class RealtimeUpdater {
     this.incrementalAnalyzer.analyzeVisibleRegions(event.textEditor.document, visibleRanges);
 
     // Use longer delay for scroll events to reduce flicker
-    this.scheduleUpdate(event.textEditor, false, 800); // 800ms delay for scroll
+    this.scheduleUpdate(event.textEditor, false, this.SCROLL_EVENT_DELAY);
   }
 
   /**
@@ -291,12 +303,12 @@ export class RealtimeUpdater {
     const fileSize = editor.document.getText().length;
     
     // Increase delay for typing scenarios to reduce flicker
-    delay = Math.max(delay, 500); // Minimum 500ms to reduce flicker
+    delay = Math.max(delay, this.MIN_TYPING_DELAY);
     
-    if (fileSize > 50000) { // 50KB
-      delay = Math.max(delay * 2, 1000); // At least 1 second for large files
-    } else if (fileSize > 20000) { // 20KB
-      delay = Math.max(delay * 1.5, 800); // 800ms for medium files
+    if (fileSize > this.LARGE_FILE_THRESHOLD) {
+      delay = Math.max(delay * 2, this.LARGE_FILE_DELAY);
+    } else if (fileSize > this.MEDIUM_FILE_THRESHOLD) {
+      delay = Math.max(delay * 1.5, this.MEDIUM_FILE_DELAY);
     }
 
     const timer = setTimeout(() => {
@@ -316,7 +328,7 @@ export class RealtimeUpdater {
       const fileSize = document.getText().length;
       
       // For large files, use progressive rendering
-      if (fileSize > 30000 && !immediate) { // 30KB threshold
+      if (fileSize > this.PROGRESSIVE_RENDER_THRESHOLD && !immediate) {
         await this.updateEditorProgressively(editor);
         return;
       }
@@ -375,7 +387,7 @@ export class RealtimeUpdater {
         } catch (error) {
           // Silently fail background processing
         }
-      }, 100); // Small delay to not block UI
+      }, this.BACKGROUND_PROCESS_DELAY);
       
     } catch (error) {
       if (this.settingsManager.enableDebugLogging()) {
@@ -489,11 +501,9 @@ export class RealtimeUpdater {
   ): Promise<ColorValue | ColorValue[] | null> {
     try {
       // Add timeout to prevent long-running variable resolution
-      const VARIABLE_RESOLUTION_TIMEOUT = 1000; // 1 second
-      
       const resolutionPromise = this.resolveVariableColorInternal(variableName, defaultValue, document);
       const timeoutPromise = new Promise<null>((_, reject) => 
-        setTimeout(() => reject(new Error('Variable resolution timeout')), VARIABLE_RESOLUTION_TIMEOUT)
+        setTimeout(() => reject(new Error('Variable resolution timeout')), this.VARIABLE_RESOLUTION_TIMEOUT)
       );
       
       return await Promise.race([resolutionPromise, timeoutPromise]);

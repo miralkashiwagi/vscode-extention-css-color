@@ -19,9 +19,16 @@ export class VariableResolverImpl implements VariableResolver {
   private workspaceFilesCache: vscode.Uri[] | null = null;
   private workspaceCacheTimestamp: number = 0;
   private errorHandler: ErrorHandler;
+  
+  // Performance and timeout constants
   private readonly RESOLUTION_TIMEOUT_MS = 5000; // 5 seconds timeout
   private readonly MAX_RESOLUTION_DEPTH = 10; // Prevent infinite recursion
   private readonly WORKSPACE_CACHE_TTL = 30000; // 30 seconds cache TTL
+  private readonly MAX_FILES_TO_SEARCH = 50; // Workspace file search limit
+  private readonly SEARCH_TIMEOUT_MS = 2000; // 2 seconds timeout
+  private readonly BATCH_SIZE = 10; // File processing batch size
+  private readonly MAX_FILE_SIZE = 100000; // 100KB file size limit
+  private readonly TOP_VARIABLES_LIMIT = 10; // Top variables report limit
 
   constructor(errorHandler: ErrorHandler) {
     this.cssParser = new CSSParser();
@@ -683,9 +690,8 @@ export class VariableResolverImpl implements VariableResolver {
       }
 
       // Process files in batches to avoid blocking
-      const BATCH_SIZE = 10;
-      for (let i = 0; i < files.length; i += BATCH_SIZE) {
-        const batch = files.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < files.length; i += this.BATCH_SIZE) {
+        const batch = files.slice(i, i + this.BATCH_SIZE);
         
         for (const fileUri of batch) {
           // Skip current document as it was already checked
@@ -698,7 +704,7 @@ export class VariableResolverImpl implements VariableResolver {
             const text = document.getText();
             
             // Skip very large files to avoid performance issues
-            if (text.length > 100000) { // 100KB limit
+            if (text.length > this.MAX_FILE_SIZE) {
               continue;
             }
             
@@ -780,19 +786,15 @@ export class VariableResolverImpl implements VariableResolver {
     }
 
     try {
-      // Limit workspace search to improve performance
-      const MAX_FILES_TO_SEARCH = 50;
-      const SEARCH_TIMEOUT_MS = 2000; // 2 seconds timeout
-
       // Search for SCSS/CSS files in workspace with exclusions for better performance
       const filePattern = new vscode.RelativePattern(workspaceFolder, '**/*.{scss,sass,css}');
       const excludePattern = '**/node_modules/**';
       
-      const searchPromise = vscode.workspace.findFiles(filePattern, excludePattern, MAX_FILES_TO_SEARCH);
+      const searchPromise = vscode.workspace.findFiles(filePattern, excludePattern, this.MAX_FILES_TO_SEARCH);
       const files = await Promise.race([
         searchPromise,
         new Promise<vscode.Uri[]>((_, reject) => 
-          setTimeout(() => reject(new Error('Workspace search timeout')), SEARCH_TIMEOUT_MS)
+          setTimeout(() => reject(new Error('Workspace search timeout')), this.SEARCH_TIMEOUT_MS)
         )
       ]);
 
@@ -1120,7 +1122,7 @@ export class VariableResolverImpl implements VariableResolver {
       .map(def => ({ variable: def, usageCount: usageCount.get(def.name) || 0 }))
       .filter(item => item.usageCount > 0)
       .sort((a, b) => b.usageCount - a.usageCount)
-      .slice(0, 10);
+      .slice(0, this.TOP_VARIABLES_LIMIT);
 
     return {
       totalVariables: definitions.length,

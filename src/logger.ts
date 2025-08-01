@@ -45,8 +45,13 @@ export class LoggerImpl implements Logger {
   private outputChannel: vscode.OutputChannel;
   private logLevel: LogLevel = LogLevel.INFO;
   private recentLogs: LogEntry[] = [];
-  private maxRecentLogs = 1000;
   private debugMode = false;
+  
+  // Logger configuration constants
+  private readonly MAX_RECENT_LOGS = 1000;
+  private readonly DEFAULT_RECENT_LOGS_COUNT = 100;
+  private readonly CATEGORY_PADDING = 20;
+  private readonly DEBUG_LOGS_COUNT = 50;
 
   constructor(channelName: string = 'CSS Variable Color Chips') {
     this.outputChannel = vscode.window.createOutputChannel(channelName);
@@ -127,7 +132,7 @@ export class LoggerImpl implements Logger {
   /**
    * Get recent log entries
    */
-  getRecentLogs(count: number = 100): LogEntry[] {
+  getRecentLogs(count: number = this.DEFAULT_RECENT_LOGS_COUNT): LogEntry[] {
     return this.recentLogs.slice(-count);
   }
 
@@ -147,7 +152,7 @@ export class LoggerImpl implements Logger {
     const logs = this.recentLogs.map(entry => {
       const timestamp = entry.timestamp.toISOString();
       const level = LogLevel[entry.level].padEnd(5);
-      const category = entry.category.padEnd(20);
+      const category = entry.category.padEnd(this.CATEGORY_PADDING);
       let line = `[${timestamp}] ${level} ${category} ${entry.message}`;
       
       if (entry.data) {
@@ -205,8 +210,8 @@ export class LoggerImpl implements Logger {
 
     // Add to recent logs
     this.recentLogs.push(entry);
-    if (this.recentLogs.length > this.maxRecentLogs) {
-      this.recentLogs = this.recentLogs.slice(-this.maxRecentLogs);
+    if (this.recentLogs.length > this.MAX_RECENT_LOGS) {
+      this.recentLogs = this.recentLogs.slice(-this.MAX_RECENT_LOGS);
     }
 
     // Format message for output channel
@@ -364,6 +369,9 @@ export class PerformanceLogger {
  */
 export class DebugInfoCollector {
   private logger: Logger;
+  
+  // Debug configuration constants
+  private readonly DEBUG_LOGS_COUNT = 50;
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -440,7 +448,7 @@ export class DebugInfoCollector {
       system: this.collectSystemInfo(),
       workspace: this.collectWorkspaceInfo(),
       extensionConfig: this.collectExtensionConfig(),
-      recentLogs: this.logger.getRecentLogs(50),
+      recentLogs: this.logger.getRecentLogs(this.DEBUG_LOGS_COUNT),
       timestamp: new Date().toISOString()
     };
 
