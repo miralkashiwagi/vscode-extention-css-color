@@ -272,13 +272,10 @@ export class SCSSParser implements Parser {
     const variableUsageRegex = /\$([a-zA-Z0-9-_]+)/g;
     let match;
     let resolvedValue = value;
-    let hasVariableReferences = false;
-
     // Reset regex
     variableUsageRegex.lastIndex = 0;
     
     while ((match = variableUsageRegex.exec(value)) !== null) {
-      hasVariableReferences = true;
       const referencedVariable = `$${match[1]}`;
       const referencedValue = this.resolveVariableValue(referencedVariable, text, visited);
       

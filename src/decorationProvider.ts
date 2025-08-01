@@ -217,7 +217,7 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     // Create new decoration type
     const decorationType = vscode.window.createTextEditorDecorationType({
-      before: sampleDecoration.renderOptions?.before || undefined
+      ...(sampleDecoration.renderOptions?.before && { before: sampleDecoration.renderOptions.before })
     });
 
     this.decorationTypes.set(colorKey, decorationType);

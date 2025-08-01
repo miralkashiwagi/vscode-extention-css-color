@@ -487,7 +487,7 @@ export class VariableResolverImpl implements VariableResolver {
       return {
         usage,
         isValid,
-        error: isValid ? undefined : `Variable '${usage.name}' is not defined` as string | undefined
+        ...(isValid ? {} : { error: `Variable '${usage.name}' is not defined` })
       };
     });
   }

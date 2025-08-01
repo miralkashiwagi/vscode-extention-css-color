@@ -447,7 +447,7 @@ export class CSSParser implements Parser {
       }
     }
 
-    return { usage, fallbackValue: fallbackValue || undefined };
+    return { usage, fallbackValue };
   }
 
   /**

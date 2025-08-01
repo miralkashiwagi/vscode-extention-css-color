@@ -200,7 +200,7 @@ export class LoggerImpl implements Logger {
       category,
       message,
       data,
-      stack: stack || undefined
+      ...(stack && { stack })
     };
 
     // Add to recent logs
