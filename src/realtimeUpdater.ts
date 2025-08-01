@@ -411,9 +411,12 @@ export class RealtimeUpdater {
 
     // Process variable definitions (medium priority)
     if (settings.showVariableDefinitions()) {
+      // console.log(`[Realtime Updater] Processing ${analysisResult.variableDefinitions?.length || 0} variable definitions`);
       for (const varDef of analysisResult.variableDefinitions || []) {
         if (!isRangeProcessed(varDef.range)) {
+          // console.log(`[Realtime Updater] Processing variable definition: ${varDef.name} = ${varDef.value}`);
           const colorValue = await this.resolveVariableColor(varDef.name, varDef.value, document);
+          // console.log(`[Realtime Updater] Resolved color for ${varDef.name}:`, colorValue);
           if (colorValue) {
             if (Array.isArray(colorValue)) {
               // Multiple colors

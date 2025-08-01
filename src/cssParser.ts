@@ -93,9 +93,16 @@ export class CSSParser implements Parser {
           range,
           type: 'css-custom-property'
         });
+        
+        // Debug log for CSS variable definitions (only when found)
+        // console.log(`[CSS Parser] Found CSS variable definition: ${variableName} = ${value} at line ${lineIndex + 1}`);
       }
     });
 
+    // Only log when definitions are found (disabled for production)
+    // if (definitions.length > 0) {
+    //   console.log(`[CSS Parser] Found ${definitions.length} CSS variable definitions`);
+    // }
     return definitions;
   }
 

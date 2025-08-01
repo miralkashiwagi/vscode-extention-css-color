@@ -58,12 +58,18 @@ export class VariableResolverImpl implements VariableResolver {
       // Find the definition for this variable
       const definition = definitions.find(def => def.name === variableName);
       if (!definition) {
+        // Variable not found in current file, try workspace-wide search
+        const workspaceResult = await this.resolveFromWorkspace(variableName, document);
+        if (workspaceResult) {
+          return workspaceResult;
+        }
         // Variable not found - this is normal, just return null
         return null;
       }
 
       // Try to parse the value as a color
       const colorValue = ColorValueImpl.fromString(definition.value);
+      // console.log(`[Variable Resolver] CSS variable ${variableName} with value "${definition.value}" - isValid: ${colorValue.isValid}`);
       if (colorValue.isValid) {
         return colorValue;
       }
@@ -165,7 +171,10 @@ export class VariableResolverImpl implements VariableResolver {
     if (languageId === 'css') {
       return this.cssParser.findVariableDefinitions(text);
     } else if (languageId === 'scss' || languageId === 'sass') {
-      return this.scssParser.findVariableDefinitions(text);
+      // SCSS files can contain both SCSS variables and CSS custom properties
+      const scssDefinitions = this.scssParser.findVariableDefinitions(text);
+      const cssDefinitions = this.cssParser.findVariableDefinitions(text);
+      return [...scssDefinitions, ...cssDefinitions];
     }
     
     // For other file types, try both parsers
@@ -185,7 +194,10 @@ export class VariableResolverImpl implements VariableResolver {
     if (languageId === 'css') {
       return this.cssParser.findVariableUsages(text);
     } else if (languageId === 'scss' || languageId === 'sass') {
-      return this.scssParser.findVariableUsages(text);
+      // SCSS files can contain both SCSS variables and CSS custom properties
+      const scssUsages = this.scssParser.findVariableUsages(text);
+      const cssUsages = this.cssParser.findVariableUsages(text);
+      return [...scssUsages, ...cssUsages];
     }
     
     // For other file types, try both parsers
@@ -646,6 +658,9 @@ export class VariableResolverImpl implements VariableResolver {
     currentDocument: vscode.TextDocument
   ): Promise<ColorValue | null> {
     try {
+      // Only log for debugging when needed
+      // console.log(`[Variable Resolver] Starting workspace search for variable: ${variableName}`);
+      
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(currentDocument.uri);
       if (!workspaceFolder) {
         return null;
@@ -689,19 +704,37 @@ export class VariableResolverImpl implements VariableResolver {
             
             // Check if this file contains the variable definition
             if (document.languageId === 'scss' || document.languageId === 'sass') {
-              const resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
-              if (resolvedValue) {
-                const colorValue = ColorValueImpl.fromString(resolvedValue);
-                if (colorValue.isValid) {
-                  return colorValue;
+              // Check for SCSS variables
+              if (variableName.startsWith('$')) {
+                const resolvedValue = this.scssParser.resolveVariableValue(variableName, text);
+                if (resolvedValue) {
+                  // console.log(`[Variable Resolver] ✓ Found SCSS variable ${variableName} in ${fileUri.fsPath}: ${resolvedValue}`);
+                  const colorValue = ColorValueImpl.fromString(resolvedValue);
+                  if (colorValue.isValid) {
+                    return colorValue;
+                  }
                 }
               }
-            } else if (document.languageId === 'css') {
-              // Also check CSS files for CSS custom properties
+              
+              // Also check for CSS custom properties in SCSS files
               if (variableName.startsWith('--')) {
                 const definitions = this.cssParser.findVariableDefinitions(text);
                 const definition = definitions.find(def => def.name === variableName);
                 if (definition) {
+                  // console.log(`[Variable Resolver] ✓ Found CSS variable ${variableName} in SCSS file ${fileUri.fsPath}: ${definition.value}`);
+                  const colorValue = ColorValueImpl.fromString(definition.value);
+                  if (colorValue.isValid) {
+                    return colorValue;
+                  }
+                }
+              }
+            } else if (document.languageId === 'css') {
+              // Check CSS files for CSS custom properties
+              if (variableName.startsWith('--')) {
+                const definitions = this.cssParser.findVariableDefinitions(text);
+                const definition = definitions.find(def => def.name === variableName);
+                if (definition) {
+                  // console.log(`[Variable Resolver] ✓ Found CSS variable ${variableName} in CSS file ${fileUri.fsPath}: ${definition.value}`);
                   const colorValue = ColorValueImpl.fromString(definition.value);
                   if (colorValue.isValid) {
                     return colorValue;
@@ -719,9 +752,12 @@ export class VariableResolverImpl implements VariableResolver {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
+      // Only log when variable is not found in debug mode
+      // console.log(`[Variable Resolver] Workspace search completed for ${variableName} - variable not found`);
       return null;
     } catch (error) {
-      // Silently fail for performance reasons
+      // Only log errors in debug mode
+      // console.log(`[Variable Resolver] Workspace search failed for ${variableName}:`, error);
       return null;
     }
   }

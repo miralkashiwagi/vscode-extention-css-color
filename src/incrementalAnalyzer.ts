@@ -155,15 +155,44 @@ export class IncrementalAnalyzer {
     regions: AnalysisRegion[]
   ): AnalysisResult {
     const result = this.createEmptyResult();
-    const parser = this.getParserForDocument(document);
+    const languageId = document.languageId;
 
     for (const region of regions) {
       try {
         const regionText = this.extractRegionText(document, region);
-        const regionResult = parser.parseDocument({
+        const mockDocument = {
           ...document,
           getText: () => regionText
-        } as vscode.TextDocument);
+        } as vscode.TextDocument;
+
+        let regionResult: ParseResult;
+
+        // Handle different file types
+        if (languageId === 'css') {
+          // CSS files: use CSS parser only
+          regionResult = this.cssParser.parseDocument(mockDocument);
+        } else if (languageId === 'scss' || languageId === 'sass') {
+          // SCSS files: use both parsers to handle SCSS variables and CSS custom properties
+          const scssResult = this.scssParser.parseDocument(mockDocument);
+          const cssResult = this.cssParser.parseDocument(mockDocument);
+          
+          // Merge results
+          regionResult = {
+            colorValues: [...scssResult.colorValues, ...cssResult.colorValues],
+            variableDefinitions: [...scssResult.variableDefinitions, ...cssResult.variableDefinitions],
+            variableUsages: [...scssResult.variableUsages, ...cssResult.variableUsages]
+          };
+        } else {
+          // Other file types: try both parsers
+          const cssResult = this.cssParser.parseDocument(mockDocument);
+          const scssResult = this.scssParser.parseDocument(mockDocument);
+          
+          regionResult = {
+            colorValues: [...cssResult.colorValues, ...scssResult.colorValues],
+            variableDefinitions: [...cssResult.variableDefinitions, ...scssResult.variableDefinitions],
+            variableUsages: [...cssResult.variableUsages, ...scssResult.variableUsages]
+          };
+        }
 
         // Adjust line numbers for region offset
         const adjustedResult = this.adjustLineNumbers(regionResult, region.startLine);
@@ -238,8 +267,15 @@ export class IncrementalAnalyzer {
   private getParserForDocument(document: vscode.TextDocument): Parser {
     const languageId = document.languageId;
     
+    // For CSS files, use CSS parser only
+    if (languageId === 'css') {
+      return this.cssParser;
+    }
+    
+    // For SCSS/Sass files, we need to handle both SCSS and CSS variables
+    // We'll use a composite approach in the analyzeRegions method
     if (languageId === 'scss' || languageId === 'sass') {
-      return this.scssParser;
+      return this.scssParser; // Primary parser, but we'll supplement with CSS parser
     }
     
     return this.cssParser;
