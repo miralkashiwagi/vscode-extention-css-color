@@ -426,8 +426,21 @@ export class ColorChipManagerImpl implements ColorChipManager {
    * Dispose all components
    */
   private disposeComponents(): void {
-    // Components are disposed through the disposables array
-    // This method is here for any additional cleanup if needed
+    try {
+      // Dispose components in reverse order of initialization
+      this.realtimeUpdater?.dispose();
+      this.fileWatcher?.dispose();
+      this.decorationProvider?.dispose();
+      this.incrementalAnalyzer?.dispose();
+      this.variableResolver?.clearCache();
+      this.dynamicModeHandler?.clearCaches();
+      this.cacheManager?.clear();
+      this.settingsManager?.dispose();
+      
+      this.logger?.debug('ColorChipManager', 'All components disposed successfully');
+    } catch (error) {
+      this.logger?.error('ColorChipManager', 'Error disposing components', error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
 
