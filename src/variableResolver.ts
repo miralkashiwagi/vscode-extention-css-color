@@ -8,9 +8,7 @@ import {
   ErrorHandler, 
   VariableResolutionError, 
   PerformanceTimeoutError,
-  withTimeout,
-  safeExecute,
-  safeExecuteSync
+  withTimeout
 } from './errorHandler';
 
 export class VariableResolverImpl implements VariableResolver {

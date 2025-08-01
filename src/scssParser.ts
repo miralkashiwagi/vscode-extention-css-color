@@ -56,7 +56,7 @@ export class SCSSParser implements Parser {
       }
 
       // Check each color pattern
-      Object.entries(SCSSParser.COLOR_PATTERNS).forEach(([type, pattern]) => {
+      Object.entries(SCSSParser.COLOR_PATTERNS).forEach(([, pattern]) => {
         const regex = new RegExp(pattern.source, pattern.flags);
         let match;
 

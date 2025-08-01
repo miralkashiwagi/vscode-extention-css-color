@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ColorValue, DisplayMode, VariableDefinition } from './types';
+import { ColorValue } from './types';
 import { SettingsManager } from './interfaces';
 import { ColorValueImpl } from './colorValue';
 
@@ -117,7 +117,7 @@ export class DynamicModeHandlerImpl implements DynamicModeHandler {
    * Handle default mode - return the default value as-is
    */
   private handleDefaultMode(
-    variableName: string,
+    _variableName: string,
     defaultValue: ColorValue | null
   ): ColorValue | null {
     return defaultValue;
@@ -281,7 +281,7 @@ export class DynamicModeHandlerImpl implements DynamicModeHandler {
    */
   private resolveFromActiveTheme(
     variableName: string,
-    document: vscode.TextDocument
+    _document: vscode.TextDocument
   ): ColorValue | null {
     // This is a simplified implementation since VSCode doesn't provide
     // direct access to computed CSS values. In a real implementation,

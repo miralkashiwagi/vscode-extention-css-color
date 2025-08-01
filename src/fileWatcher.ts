@@ -239,7 +239,7 @@ export class FileWatcherImpl implements FileWatcher {
   /**
    * Debounce file changes to avoid excessive notifications
    */
-  private debounceFileChange(uri: vscode.Uri, changeType: string): void {
+  private debounceFileChange(uri: vscode.Uri, _changeType: string): void {
     const uriString = uri.toString();
     const debounceDelay = this.settingsManager.getDebounceDelay();
 

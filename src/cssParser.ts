@@ -45,7 +45,7 @@ export class CSSParser implements Parser {
     // Find all color matches
     lines.forEach((line, lineIndex) => {
       // Check each color pattern
-      Object.entries(CSSParser.COLOR_PATTERNS).forEach(([type, pattern]) => {
+      Object.entries(CSSParser.COLOR_PATTERNS).forEach(([, pattern]) => {
         const regex = new RegExp(pattern.source, pattern.flags);
         let match;
 
@@ -270,7 +270,7 @@ export class CSSParser implements Parser {
         return;
       }
 
-      Object.entries(CSSParser.COLOR_PATTERNS).forEach(([type, pattern]) => {
+      Object.entries(CSSParser.COLOR_PATTERNS).forEach(([, pattern]) => {
         const regex = new RegExp(pattern.source, pattern.flags);
         let match;
 
@@ -335,7 +335,7 @@ export class CSSParser implements Parser {
         const value = match[2].trim();
         
         // Check if the value itself is a color
-        const isColorValue = this.isColorValue(value);
+        // const isColorValue = this.isColorValue(value);
         
         const startPos = new vscode.Position(lineIndex, match.index);
         const endPos = new vscode.Position(lineIndex, match.index + match[0].length);
@@ -529,9 +529,7 @@ export class CSSParser implements Parser {
 
   // Utility methods for enhanced analysis
 
-  private isColorValue(value: string): boolean {
-    return ColorValueImpl.isValidColor(value);
-  }
+
 
   private isLineInComment(line: string): boolean {
     const trimmed = line.trim();

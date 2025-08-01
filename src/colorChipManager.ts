@@ -10,7 +10,7 @@ import { DynamicModeHandlerImpl } from './dynamicModeHandler';
 import { RealtimeUpdater } from './realtimeUpdater';
 import { CSSParser } from './cssParser';
 import { SCSSParser } from './scssParser';
-import { ErrorHandlerImpl, ErrorHandler, safeExecute } from './errorHandler';
+import { ErrorHandlerImpl, ErrorHandler } from './errorHandler';
 import { initializeLogger, LoggerImpl, PerformanceLogger, DebugInfoCollector } from './logger';
 
 export class ColorChipManagerImpl implements ColorChipManager {
@@ -42,23 +42,23 @@ export class ColorChipManagerImpl implements ColorChipManager {
     }
 
     const activationTimer = 'extension-activation';
-    
+
     try {
       // Initialize logger first
       this.logger = initializeLogger(context);
       this.performanceLogger = new PerformanceLogger(this.logger);
       this.debugInfoCollector = new DebugInfoCollector(this.logger);
-      
+
       this.performanceLogger.startTimer(activationTimer, 'Extension activation');
       this.logger.info('ColorChipManager', 'Starting extension activation');
 
       // Initialize error handler
       this.errorHandler = new ErrorHandlerImpl();
-      
+
       // Enable debug mode if in development
       const isDebug = context.extensionMode === vscode.ExtensionMode.Development;
       (this.errorHandler as ErrorHandlerImpl).setDebugMode(isDebug);
-      
+
       this.logger.debug('ColorChipManager', 'Error handler initialized', { debugMode: isDebug });
 
       // Initialize all components
@@ -78,7 +78,7 @@ export class ColorChipManagerImpl implements ColorChipManager {
       }
 
       this.isActivated = true;
-      
+
       const activationTime = this.performanceLogger.endTimer(activationTimer, 'Extension activation');
       this.logger.info('ColorChipManager', `Extension activated successfully in ${activationTime}ms`);
 
@@ -107,7 +107,7 @@ export class ColorChipManagerImpl implements ColorChipManager {
     }
 
     const deactivationTimer = 'extension-deactivation';
-    
+
     try {
       this.performanceLogger?.startTimer(deactivationTimer, 'Extension deactivation');
       this.logger?.info('ColorChipManager', 'Starting extension deactivation');
@@ -167,7 +167,7 @@ export class ColorChipManagerImpl implements ColorChipManager {
     try {
       // Settings are automatically handled by SettingsManager callbacks
       // This method is here for manual refresh if needed
-      
+
       if (this.settingsManager.isEnabled()) {
         if (!this.realtimeUpdater.getStats().isActive) {
           this.realtimeUpdater.start();
@@ -229,7 +229,7 @@ export class ColorChipManagerImpl implements ColorChipManager {
   clearAllDecorations(): void {
     try {
       const visibleEditors = vscode.window.visibleTextEditors;
-      
+
       for (const editor of visibleEditors) {
         this.decorationProvider.clearDecorations(editor);
       }
@@ -251,9 +251,9 @@ export class ColorChipManagerImpl implements ColorChipManager {
     try {
       const currentState = this.settingsManager.isEnabled();
       await this.settingsManager.updateSetting('enabled', !currentState);
-      
+
       // Settings change will be handled automatically by the settings manager callback
-      
+
     } catch (error) {
       console.error('Failed to toggle extension state:', error);
       vscode.window.showErrorMessage('Failed to toggle CSS Variable Color Chips extension');
@@ -356,7 +356,7 @@ export class ColorChipManagerImpl implements ColorChipManager {
       }),
       vscode.commands.registerCommand('cssVariableColorChips.refreshDocument', (uri?: vscode.Uri) => {
         if (uri) {
-          const document = vscode.workspace.textDocuments.find(doc => 
+          const document = vscode.workspace.textDocuments.find(doc =>
             doc.uri.toString() === uri.toString()
           );
           if (document) {
@@ -364,7 +364,7 @@ export class ColorChipManagerImpl implements ColorChipManager {
           }
         }
       }),
-      
+
       // Debug commands
       vscode.commands.registerCommand('cssVariableColorChips.showLogs', () => {
         this.showLogs();
@@ -430,38 +430,7 @@ export class ColorChipManagerImpl implements ColorChipManager {
     // This method is here for any additional cleanup if needed
   }
 
-  /**
-   * Handle extension errors
-   */
-  private handleError(error: Error, context: string): void {
-    if (this.settingsManager?.enableDebugLogging()) {
-      console.error(`CSS Variable Color Chips - ${context}:`, error);
-    }
 
-    // Show user-friendly error message for critical errors
-    if (context.includes('activation') || context.includes('critical')) {
-      vscode.window.showErrorMessage(
-        `CSS Variable Color Chips: ${context}. Check the console for details.`
-      );
-    }
-  }
-
-  /**
-   * Validate extension state
-   */
-  private validateState(): boolean {
-    if (!this.isActivated) {
-      console.warn('CSS Variable Color Chips: Extension not activated');
-      return false;
-    }
-
-    if (!this.settingsManager) {
-      console.error('CSS Variable Color Chips: Settings manager not initialized');
-      return false;
-    }
-
-    return true;
-  }
 
   /**
    * Get component health status
@@ -499,12 +468,12 @@ export class ColorChipManagerImpl implements ColorChipManager {
     let errorStats;
     if (this.errorHandler) {
       errorStats = this.errorHandler.getErrorStats();
-      
+
       // Check error levels
       if (errorStats.totalErrors > 0) {
         const criticalErrors = errorStats.errorsBySeverity.critical || 0;
         const highErrors = errorStats.errorsBySeverity.high || 0;
-        
+
         if (criticalErrors > 0) {
           issues.push(`${criticalErrors} critical errors detected`);
         }
@@ -589,10 +558,10 @@ export class ColorChipManagerImpl implements ColorChipManager {
     if (this.logger) {
       const currentDebugMode = this.logger.isDebugMode();
       this.logger.setDebugMode(!currentDebugMode);
-      
+
       const newState = this.logger.isDebugMode() ? 'enabled' : 'disabled';
       vscode.window.showInformationMessage(`Debug mode ${newState}`);
-      
+
       this.logger.info('Debug', `Debug mode toggled to ${newState}`);
     } else {
       vscode.window.showWarningMessage('Logger not initialized');

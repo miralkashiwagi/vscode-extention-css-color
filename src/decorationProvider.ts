@@ -458,18 +458,7 @@ export class DecorationProviderImpl implements DecorationProvider {
       (start1 <= end2 + chipWidth && end1 + chipWidth >= start2);
   }
 
-  /**
-   * Check if two positions overlap considering chip size
-   */
-  private positionsOverlap(endPos: vscode.Position, startPos: vscode.Position): boolean {
-    // Same line and positions are close enough to cause visual overlap
-    if (endPos.line === startPos.line) {
-      const chipSize = this.getChipSize();
-      const chipWidth = this.getChipWidthInCharacters(chipSize);
-      return (startPos.character - endPos.character) < chipWidth;
-    }
-    return false;
-  }
+
 
   /**
    * Get chip width in character units for overlap calculation
@@ -482,31 +471,6 @@ export class DecorationProviderImpl implements DecorationProvider {
       large: 3
     };
     return widths[size] || widths.medium;
-  }
-
-  /**
-   * Adjust decoration position to avoid overlap
-   */
-  private adjustDecorationPosition(
-    decoration: vscode.DecorationOptions,
-    lastEndPosition: vscode.Position
-  ): vscode.DecorationOptions {
-    const chipSize = this.getChipSize();
-    const chipWidth = this.getChipWidthInCharacters(chipSize);
-
-    // Calculate new position with spacing
-    const newStartCharacter = lastEndPosition.character + chipWidth + 1; // +1 for spacing
-    const newRange = new vscode.Range(
-      decoration.range.start.line,
-      newStartCharacter,
-      decoration.range.end.line,
-      newStartCharacter + (decoration.range.end.character - decoration.range.start.character)
-    );
-
-    return {
-      ...decoration,
-      range: newRange
-    };
   }
 
   /**

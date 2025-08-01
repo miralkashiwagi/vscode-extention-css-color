@@ -261,25 +261,7 @@ export class IncrementalAnalyzer {
     };
   }
 
-  /**
-   * Get appropriate parser for document
-   */
-  private getParserForDocument(document: vscode.TextDocument): Parser {
-    const languageId = document.languageId;
-    
-    // For CSS files, use CSS parser only
-    if (languageId === 'css') {
-      return this.cssParser;
-    }
-    
-    // For SCSS/Sass files, we need to handle both SCSS and CSS variables
-    // We'll use a composite approach in the analyzeRegions method
-    if (languageId === 'scss' || languageId === 'sass') {
-      return this.scssParser; // Primary parser, but we'll supplement with CSS parser
-    }
-    
-    return this.cssParser;
-  }
+
 
   /**
    * Merge two analysis results
