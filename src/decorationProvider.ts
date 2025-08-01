@@ -281,17 +281,19 @@ export class DecorationProviderImpl implements DecorationProvider {
     markdown.appendMarkdown(`${colorPreview}\n\n`);
 
     // Color information
+    // const colorInfo = [
+    //   `**Resolved Color:**`,
+    //   `- Hex: \`${resolvedColor.hex}\``,
+    //   `- RGB: \`rgb(${resolvedColor.rgb.r}, ${resolvedColor.rgb.g}, ${resolvedColor.rgb.b}${resolvedColor.rgb.a !== undefined ? `, ${resolvedColor.rgb.a}` : ''})\``,
+    //   `- HSL: \`hsl(${resolvedColor.hsl.h}, ${resolvedColor.hsl.s}%, ${resolvedColor.hsl.l}%${resolvedColor.hsl.a !== undefined ? `, ${resolvedColor.hsl.a}` : ''})\``
+    // ];
+    
     const colorInfo = [
-      `**Resolved Color:**`,
-      `- Hex: \`${resolvedColor.hex}\``,
-      `- RGB: \`rgb(${resolvedColor.rgb.r}, ${resolvedColor.rgb.g}, ${resolvedColor.rgb.b}${resolvedColor.rgb.a !== undefined ? `, ${resolvedColor.rgb.a}` : ''})\``,
-      `- HSL: \`hsl(${resolvedColor.hsl.h}, ${resolvedColor.hsl.s}%, ${resolvedColor.hsl.l}%${resolvedColor.hsl.a !== undefined ? `, ${resolvedColor.hsl.a}` : ''})\``
+      `**Resolved Color:** Hex: \`${resolvedColor.hex}\` RGB: \`rgb(${resolvedColor.rgb.r}, ${resolvedColor.rgb.g}, ${resolvedColor.rgb.b}${resolvedColor.rgb.a !== undefined ? `, ${resolvedColor.rgb.a}` : ''})\``,
     ];
 
     if (fallbackColor) {
-      colorInfo.push('', `**Fallback Color:**`);
-      colorInfo.push(`- Hex: \`${fallbackColor.hex}\``);
-      colorInfo.push(`- RGB: \`rgb(${fallbackColor.rgb.r}, ${fallbackColor.rgb.g}, ${fallbackColor.rgb.b}${fallbackColor.rgb.a !== undefined ? `, ${fallbackColor.rgb.a}` : ''})\``);
+      colorInfo.push('', `**Fallback Color:** Hex: \`${fallbackColor.hex}\` RGB: \`rgb(${fallbackColor.rgb.r}, ${fallbackColor.rgb.g}, ${fallbackColor.rgb.b}${fallbackColor.rgb.a !== undefined ? `, ${fallbackColor.rgb.a}` : ''})\``);
     }
 
     markdown.appendMarkdown(colorInfo.join('\n'));
