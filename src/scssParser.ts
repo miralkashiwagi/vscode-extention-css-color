@@ -118,8 +118,8 @@ export class SCSSParser implements Parser {
   findVariableUsages(text: string): VariableUsage[] {
     const usages: VariableUsage[] = [];
     const lines = text.split('\n');
-    const definitions = this.findVariableDefinitions(text);
-    const definedVariables = new Set(definitions.map(def => def.name));
+    // const definitions = this.findVariableDefinitions(text);
+    // const definedVariables = new Set(definitions.map(def => def.name));
 
     lines.forEach((line, lineIndex) => {
       // Skip SCSS comments
@@ -348,36 +348,7 @@ export class SCSSParser implements Parser {
     return colonMatch !== null;
   }
 
-  /**
-   * Check if a line is inside a string literal
-   */
-  private isInString(line: string, position: number): boolean {
-    let inSingleQuote = false;
-    let inDoubleQuote = false;
-    let escaped = false;
 
-    for (let i = 0; i < position && i < line.length; i++) {
-      const char = line[i];
-
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
-
-      if (char === '"' && !inSingleQuote) {
-        inDoubleQuote = !inDoubleQuote;
-      } else if (char === "'" && !inDoubleQuote) {
-        inSingleQuote = !inSingleQuote;
-      }
-    }
-
-    return inSingleQuote || inDoubleQuote;
-  }
 
   /**
    * Get SCSS variable definition context (mixin, function, selector, etc.)
@@ -422,8 +393,8 @@ export class SCSSParser implements Parser {
   findVariableUsagesEnhanced(text: string): VariableUsage[] {
     const usages: VariableUsage[] = [];
     const lines = text.split('\n');
-    const definitions = this.findVariableDefinitions(text);
-    const definedVariables = new Set(definitions.map(def => def.name));
+    // const definitions = this.findVariableDefinitions(text);
+    // const definedVariables = new Set(definitions.map(def => def.name));
 
     lines.forEach((line, lineIndex) => {
       // Skip SCSS comments
@@ -462,7 +433,7 @@ export class SCSSParser implements Parser {
       const range = new vscode.Range(startPos, endPos);
 
       // Determine usage context
-      const context = this.getVariableUsageContext(line, match.index);
+      // const context = this.getVariableUsageContext(line, match.index);
 
       const usage: VariableUsage = {
         name: variableName,
@@ -476,37 +447,7 @@ export class SCSSParser implements Parser {
     return matches;
   }
 
-  /**
-   * Get the context of a variable usage (property value, function parameter, etc.)
-   */
-  private getVariableUsageContext(line: string, variableIndex: number): string {
-    const beforeVariable = line.substring(0, variableIndex).trim();
-    const afterVariable = line.substring(variableIndex);
 
-    // Check if it's in a property value
-    if (beforeVariable.includes(':')) {
-      const propertyMatch = beforeVariable.match(/([a-zA-Z-]+)\s*:\s*[^:]*$/);
-      if (propertyMatch) {
-        return `property:${propertyMatch[1]}`;
-      }
-    }
-
-    // Check if it's in a function call
-    const functionMatch = beforeVariable.match(/([a-zA-Z-]+)\s*\([^)]*$/);
-    if (functionMatch) {
-      return `function:${functionMatch[1]}`;
-    }
-
-    // Check if it's in a mixin include
-    if (beforeVariable.includes('@include')) {
-      const mixinMatch = beforeVariable.match(/@include\s+([a-zA-Z-]+)/);
-      if (mixinMatch) {
-        return `mixin:${mixinMatch[1]}`;
-      }
-    }
-
-    return 'unknown';
-  }
 
   /**
    * Analyze variable reference chains and dependencies

@@ -120,7 +120,7 @@ export class DecorationProviderImpl implements DecorationProvider {
   /**
    * Create chip style based on size
    */
-  private createChipStyle(color: ColorValue, size: ChipSize): {
+  private createChipStyle(_color: ColorValue, size: ChipSize): {
     width: string;
     height: string;
     margin: string;
@@ -217,7 +217,7 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     // Create new decoration type
     const decorationType = vscode.window.createTextEditorDecorationType({
-      before: sampleDecoration.renderOptions?.before
+      before: sampleDecoration.renderOptions?.before || undefined
     });
 
     this.decorationTypes.set(colorKey, decorationType);
@@ -313,8 +313,8 @@ export class DecorationProviderImpl implements DecorationProvider {
     const chipStyle = this.createChipStyle(colors[0], chipSize);
 
     // Create gradient background for multiple colors
-    const gradientColors = colors.map(color => color.hex).join(', ');
-    const gradient = `linear-gradient(90deg, ${gradientColors})`;
+    // const gradientColors = colors.map(color => color.hex).join(', ');
+    // const gradient = `linear-gradient(90deg, ${gradientColors})`;
 
     const decoration: vscode.DecorationOptions = {
       range,

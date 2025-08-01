@@ -41,7 +41,7 @@ export class CSSVariableColorChipsError extends Error {
     this.name = 'CSSVariableColorChipsError';
     this.type = type;
     this.severity = severity;
-    this.context = context;
+    this.context = context || {};
     this.timestamp = new Date();
   }
 }
@@ -318,7 +318,7 @@ export async function safeExecute<T>(
   operation: () => Promise<T>,
   fallback: T,
   errorHandler: ErrorHandler,
-  operationName: string
+  _operationName: string
 ): Promise<T> {
   try {
     return await operation();
@@ -335,7 +335,7 @@ export function safeExecuteSync<T>(
   operation: () => T,
   fallback: T,
   errorHandler: ErrorHandler,
-  operationName: string
+  _operationName: string
 ): T {
   try {
     return operation();
