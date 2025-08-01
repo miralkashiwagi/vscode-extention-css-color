@@ -40,11 +40,9 @@ export class DecorationProviderImpl implements DecorationProvider {
 
     const editorId = editor.document.uri.toString();
 
-    // Always clear existing decorations for this editor first
-    this.clearDecorations(editor);
-
-    // If no new decorations, we're done (old decorations are already cleared)
+    // If no new decorations, clear existing ones
     if (decorations.length === 0) {
+      this.clearDecorations(editor);
       return;
     }
 

@@ -212,7 +212,7 @@ export class RealtimeUpdater {
   }
 
   /**
-   * Handle visible ranges change
+   * Handle visible ranges change with reduced frequency
    */
   private handleVisibleRangesChange(event: vscode.TextEditorVisibleRangesChangeEvent): void {
     if (!this.shouldProcessDocument(event.textEditor.document)) {
@@ -223,8 +223,8 @@ export class RealtimeUpdater {
     const visibleRanges = [...event.textEditor.visibleRanges];
     this.incrementalAnalyzer.analyzeVisibleRegions(event.textEditor.document, visibleRanges);
 
-    // Schedule update
-    this.scheduleUpdate(event.textEditor, false);
+    // Use longer delay for scroll events to reduce flicker
+    this.scheduleUpdate(event.textEditor, false, 800); // 800ms delay for scroll
   }
 
   /**
@@ -266,7 +266,7 @@ export class RealtimeUpdater {
   }
 
   /**
-   * Schedule debounced update for editor with adaptive delay
+   * Schedule debounced update for editor with flicker reduction
    */
   private scheduleUpdate(
     editor: vscode.TextEditor,
@@ -286,14 +286,17 @@ export class RealtimeUpdater {
       return;
     }
 
-    // Adaptive delay based on file size
+    // Longer delay for typing to reduce flicker
     let delay = customDelay || this.settingsManager.getDebounceDelay();
     const fileSize = editor.document.getText().length;
+    
+    // Increase delay for typing scenarios to reduce flicker
+    delay = Math.max(delay, 500); // Minimum 500ms to reduce flicker
     
     if (fileSize > 50000) { // 50KB
       delay = Math.max(delay * 2, 1000); // At least 1 second for large files
     } else if (fileSize > 20000) { // 20KB
-      delay = Math.max(delay * 1.5, 600); // 600ms for medium files
+      delay = Math.max(delay * 1.5, 800); // 800ms for medium files
     }
 
     const timer = setTimeout(() => {
