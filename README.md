@@ -36,7 +36,6 @@ $primary-color: #3498db;
 
 主な設定項目：
 
-- `cssVariableColorChips.chipSize` - チップサイズ（small/medium/large）
 - `cssVariableColorChips.variableResolutionScope` - 検索範囲（file/workspace）
 
 ## 対応ファイル
