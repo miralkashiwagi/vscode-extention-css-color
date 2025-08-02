@@ -1,6 +1,6 @@
 # Development Guide
 
-CSS Variable Color Chips拡張機能の開発者向けドキュメントです。
+SCSS Variable Color Chips拡張機能の開発者向けドキュメントです。
 
 ## 🏗️ アーキテクチャ
 

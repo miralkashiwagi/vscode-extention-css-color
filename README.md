@@ -1,4 +1,4 @@
-# CSS Variable Color Chips
+# SCSS Variable Color Chips
 
 CSS/SCSS変数の色値をカラーチップで表示するVSCode拡張機能です。
 

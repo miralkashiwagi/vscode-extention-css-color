@@ -1,6 +1,6 @@
 {
-  "name": "css-variable-color-chips",
-  "displayName": "CSS Variable Color Chips",
+  "name": "scss-variable-color-chips",
+  "displayName": "SCSS Variable Color Chips",
   "publisher": "miral-kashiwagi",
   "categories": [
     "Programming Languages"
@@ -13,7 +13,7 @@
     "variable",
     "visualization"
   ],
-  "description": "Display color chips for CSS custom properties and SCSS variables with advanced workspace-wide variable resolution",
+  "description": "Display color chips for SCSS variables and CSS custom properties with advanced workspace-wide variable resolution",
   "version": "0.0.1",
   "license": "MIT",
   "repository": {
