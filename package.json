@@ -14,7 +14,7 @@
     "visualization"
   ],
   "description": "Display color chips for SCSS variables and CSS custom properties with advanced workspace-wide variable resolution",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
