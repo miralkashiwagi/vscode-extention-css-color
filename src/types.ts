@@ -72,5 +72,4 @@ export enum VariableResolutionError {
 
 // Settings types
 export type DisplayMode = 'default' | 'computed' | 'multiple';
-export type ChipSize = 'small' | 'medium' | 'large';
 export type ResolutionScope = 'file' | 'workspace';

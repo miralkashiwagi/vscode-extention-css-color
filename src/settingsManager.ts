@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SettingsManager } from './interfaces';
-import { DisplayMode, ChipSize, ResolutionScope } from './types';
+import { DisplayMode, ResolutionScope } from './types';
 import { 
   ErrorHandler, 
   SettingsValidationError,
@@ -129,22 +129,7 @@ export class SettingsManagerImpl implements SettingsManager {
     return 'workspace';
   }
 
-  /**
-   * Get the chip size setting
-   */
-  getChipSize(): ChipSize {
-    const config = this.getConfiguration();
-    const size = config.get<string>('chipSize', 'medium');
-    
-    // Validate the size value
-    if (this.isValidChipSize(size)) {
-      return size as ChipSize;
-    }
-    
-    // Fallback to medium if invalid
-    console.warn(`Invalid chip size: ${size}. Using medium.`);
-    return 'medium';
-  }
+
 
   /**
    * Get whether the extension is enabled
@@ -277,7 +262,6 @@ export class SettingsManagerImpl implements SettingsManager {
       'displayMode',
       'enabledFileTypes',
       'variableResolutionScope',
-      'chipSize',
       'enabled',
       'showVariableDefinitions',
       'showVariableUsages',
@@ -307,7 +291,6 @@ export class SettingsManagerImpl implements SettingsManager {
       displayMode: this.getDisplayMode(),
       enabledFileTypes: this.getEnabledFileTypes(),
       variableResolutionScope: this.getVariableResolutionScope(),
-      chipSize: this.getChipSize(),
       enabled: this.isEnabled(),
       showVariableDefinitions: this.showVariableDefinitions(),
       showVariableUsages: this.showVariableUsages(),
@@ -337,12 +320,6 @@ export class SettingsManagerImpl implements SettingsManager {
     const resolutionScope = config.get<string>('variableResolutionScope');
     if (resolutionScope && !this.isValidResolutionScope(resolutionScope)) {
       issues.push(`Invalid resolution scope: ${resolutionScope}`);
-    }
-
-    // Check chip size
-    const chipSize = config.get<string>('chipSize');
-    if (chipSize && !this.isValidChipSize(chipSize)) {
-      issues.push(`Invalid chip size: ${chipSize}`);
     }
 
     // Check numeric ranges
@@ -421,10 +398,5 @@ export class SettingsManagerImpl implements SettingsManager {
     return ['file', 'workspace'].includes(scope);
   }
 
-  /**
-   * Validate chip size value
-   */
-  private isValidChipSize(size: string): boolean {
-    return ['small', 'medium', 'large'].includes(size);
-  }
+
 }

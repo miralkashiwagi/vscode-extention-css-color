@@ -389,7 +389,6 @@ class MockSettingsManager implements SettingsManager {
   getDisplayMode() { return 'default' as const; }
   getEnabledFileTypes() { return this.enabledFileTypes; }
   getVariableResolutionScope() { return 'workspace' as const; }
-  getChipSize() { return 'medium' as const; }
   isEnabled() { return true; }
   showVariableDefinitions() { return true; }
   showVariableUsages() { return true; }

@@ -79,17 +79,23 @@ suite('ColorChipManager Tests', () => {
     test('should clear all decorations', () => {
       colorChipManager.activate(mockContext);
 
-      // Mock visible editors
-      const originalVisibleTextEditors = vscode.window.visibleTextEditors;
+      // Mock visible editors using Object.defineProperty
+      const originalDescriptor = Object.getOwnPropertyDescriptor(vscode.window, 'visibleTextEditors');
       const mockEditor = createMockEditor(createMockDocument('test.css', 'css'));
-      (vscode.window as any).visibleTextEditors = [mockEditor];
+      
+      Object.defineProperty(vscode.window, 'visibleTextEditors', {
+        value: [mockEditor],
+        configurable: true
+      });
 
       assert.doesNotThrow(() => {
         colorChipManager.clearAllDecorations();
       });
 
-      // Restore original
-      (vscode.window as any).visibleTextEditors = originalVisibleTextEditors;
+      // Restore original property
+      if (originalDescriptor) {
+        Object.defineProperty(vscode.window, 'visibleTextEditors', originalDescriptor);
+      }
     });
   });
 

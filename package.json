@@ -78,21 +78,7 @@
             "Resolve variables across the entire workspace"
           ]
         },
-        "cssVariableColorChips.chipSize": {
-          "type": "string",
-          "enum": [
-            "small",
-            "medium",
-            "large"
-          ],
-          "default": "medium",
-          "description": "Size of color chips",
-          "enumDescriptions": [
-            "Small chips (8x8px)",
-            "Medium chips (12x12px)",
-            "Large chips (16x16px)"
-          ]
-        },
+
         "cssVariableColorChips.showVariableDefinitions": {
           "type": "boolean",
           "default": true,

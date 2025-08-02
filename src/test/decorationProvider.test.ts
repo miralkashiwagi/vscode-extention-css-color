@@ -248,18 +248,7 @@ suite('DecorationProvider Tests', () => {
   });
 
   suite('Settings Integration', () => {
-    test('should respect chip size settings', () => {
-      // Mock different chip sizes
-      const originalGet = vscode.workspace.getConfiguration;
-      
-      // Test small size
-      vscode.workspace.getConfiguration = () => ({
-        get: (key: string, defaultValue?: any) => {
-          if (key === 'chipSize') {return 'small';}
-          return defaultValue;
-        }
-      } as any);
-
+    test('should use fixed medium size styling', () => {
       const color: ColorValue = {
         hex: '#ff0000',
         rgb: { r: 255, g: 0, b: 0 },
@@ -269,11 +258,9 @@ suite('DecorationProvider Tests', () => {
       };
       const decoration = provider.createColorChip(color, new vscode.Range(0, 0, 0, 7));
 
-      assert.strictEqual(decoration.renderOptions?.before?.width, '8px');
-      assert.strictEqual(decoration.renderOptions?.before?.height, '8px');
-
-      // Restore original function
-      vscode.workspace.getConfiguration = originalGet;
+      assert.strictEqual(decoration.renderOptions?.before?.width, '12px');
+      assert.strictEqual(decoration.renderOptions?.before?.height, '12px');
+      assert.strictEqual(decoration.renderOptions?.before?.margin, '0 4px 0 0');
     });
   });
 
@@ -367,33 +354,7 @@ suite('DecorationProvider Tests', () => {
       });
     });
 
-    test('should adjust chip size based on settings', () => {
-      // Mock different chip sizes
-      const originalGet = vscode.workspace.getConfiguration;
-      
-      // Test large size
-      vscode.workspace.getConfiguration = () => ({
-        get: (key: string, defaultValue?: any) => {
-          if (key === 'chipSize') {return 'large';}
-          return defaultValue;
-        }
-      } as any);
 
-      const color: ColorValue = {
-        hex: '#ff0000',
-        rgb: { r: 255, g: 0, b: 0 },
-        hsl: { h: 0, s: 100, l: 50 },
-        original: '#ff0000',
-        isValid: true
-      };
-      const decoration = provider.createColorChip(color, new vscode.Range(0, 0, 0, 7));
-
-      assert.strictEqual(decoration.renderOptions?.before?.width, '16px');
-      assert.strictEqual(decoration.renderOptions?.before?.height, '16px');
-
-      // Restore original function
-      vscode.workspace.getConfiguration = originalGet;
-    });
   });
 
   suite('Error Handling', () => {

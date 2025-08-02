@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { DecorationProvider } from './interfaces';
-import { ColorValue, ChipSize } from './types';
+import { ColorValue } from './types';
 
 export class DecorationProviderImpl implements DecorationProvider {
   private decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
   private activeDecorations: Map<string, vscode.TextEditorDecorationType[]> = new Map();
-  
+
   // Color and styling constants
   private readonly LIGHT_COLOR_THRESHOLD = 0.7; // Threshold for "light" color
   private readonly LUMINANCE_RED_FACTOR = 0.2126;
@@ -16,8 +16,7 @@ export class DecorationProviderImpl implements DecorationProvider {
    * Create a color chip decoration for a given color and range
    */
   createColorChip(color: ColorValue, range: vscode.Range): vscode.DecorationOptions {
-    const chipSize = this.getChipSize();
-    const chipStyle = this.createChipStyle(color, chipSize);
+    const chipStyle = this.createChipStyle(color);
 
     return {
       range,
@@ -115,29 +114,17 @@ export class DecorationProviderImpl implements DecorationProvider {
 
   // Private helper methods
 
-  /**
-   * Get chip size from settings
-   */
-  private getChipSize(): ChipSize {
-    const config = vscode.workspace.getConfiguration('cssVariableColorChips');
-    return config.get<ChipSize>('chipSize', 'medium');
-  }
+
 
   /**
-   * Create chip style based on size
+   * Create chip style with fixed medium size
    */
-  private createChipStyle(_color: ColorValue, size: ChipSize): {
+  private createChipStyle(_color: ColorValue): {
     width: string;
     height: string;
     margin: string;
   } {
-    const styles = {
-      small: { width: '8px', height: '8px', margin: '0 2px 0 0' },
-      medium: { width: '12px', height: '12px', margin: '0 4px 0 0' },
-      large: { width: '16px', height: '16px', margin: '0 6px 0 0' }
-    };
-
-    return styles[size] || styles.medium;
+    return { width: '12px', height: '12px', margin: '0 4px 0 0' };
   }
 
   /**
@@ -239,8 +226,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     range: vscode.Range,
     fallbackColor?: ColorValue
   ): vscode.DecorationOptions {
-    const chipSize = this.getChipSize();
-    const chipStyle = this.createChipStyle(resolvedColor, chipSize);
+    const chipStyle = this.createChipStyle(resolvedColor);
 
     // Create compound decoration for variable with fallback
     const decoration: vscode.DecorationOptions = {
@@ -287,7 +273,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     //   `- RGB: \`rgb(${resolvedColor.rgb.r}, ${resolvedColor.rgb.g}, ${resolvedColor.rgb.b}${resolvedColor.rgb.a !== undefined ? `, ${resolvedColor.rgb.a}` : ''})\``,
     //   `- HSL: \`hsl(${resolvedColor.hsl.h}, ${resolvedColor.hsl.s}%, ${resolvedColor.hsl.l}%${resolvedColor.hsl.a !== undefined ? `, ${resolvedColor.hsl.a}` : ''})\``
     // ];
-    
+
     const colorInfo = [
       `**Resolved Color:** Hex: \`${resolvedColor.hex}\` RGB: \`rgb(${resolvedColor.rgb.r}, ${resolvedColor.rgb.g}, ${resolvedColor.rgb.b}${resolvedColor.rgb.a !== undefined ? `, ${resolvedColor.rgb.a}` : ''})\``,
     ];
@@ -317,8 +303,7 @@ export class DecorationProviderImpl implements DecorationProvider {
       return this.createColorChip(colors[0], range);
     }
 
-    const chipSize = this.getChipSize();
-    const chipStyle = this.createChipStyle(colors[0], chipSize);
+    const chipStyle = this.createChipStyle(colors[0]);
 
     // Create gradient background for multiple colors
     // const gradientColors = colors.map(color => color.hex).join(', ');
@@ -453,8 +438,7 @@ export class DecorationProviderImpl implements DecorationProvider {
     }
 
     // Same line - check character overlap with chip width consideration
-    const chipSize = this.getChipSize();
-    const chipWidth = this.getChipWidthInCharacters(chipSize);
+    const chipWidth = this.getChipWidthInCharacters();
 
     const start1 = range1.start.character;
     const end1 = range1.end.character;
@@ -471,14 +455,9 @@ export class DecorationProviderImpl implements DecorationProvider {
   /**
    * Get chip width in character units for overlap calculation
    */
-  private getChipWidthInCharacters(size: ChipSize): number {
-    // Approximate character width based on chip size
-    const widths = {
-      small: 1,
-      medium: 2,
-      large: 3
-    };
-    return widths[size] || widths.medium;
+  private getChipWidthInCharacters(): number {
+    // Fixed medium size width (1.5 characters as specified in requirements)
+    return 1.5;
   }
 
   /**
@@ -497,8 +476,7 @@ export class DecorationProviderImpl implements DecorationProvider {
       return [this.createColorChip(colors[0], baseRange)];
     }
 
-    const chipSize = this.getChipSize();
-    const chipWidth = this.getChipWidthInCharacters(chipSize);
+    const chipWidth = this.getChipWidthInCharacters();
     const decorations: vscode.DecorationOptions[] = [];
 
     colors.forEach((color, index) => {
@@ -567,8 +545,7 @@ export class DecorationProviderImpl implements DecorationProvider {
       return this.createColorChip(colors[0], range);
     }
 
-    const chipSize = this.getChipSize();
-    const chipStyle = this.createChipStyle(colors[0], chipSize);
+    const chipStyle = this.createChipStyle(colors[0]);
 
     // Show primary color with indicator for additional colors
     const visibleColors = colors.slice(0, maxVisible);

@@ -86,28 +86,7 @@ suite('SettingsManager Tests', () => {
     });
   });
 
-  suite('Chip Size Settings', () => {
-    test('should return default chip size', () => {
-      mockConfiguration({});
 
-      const size = settingsManager.getChipSize();
-      assert.strictEqual(size, 'medium');
-    });
-
-    test('should return configured chip size', () => {
-      mockConfiguration({ chipSize: 'large' });
-
-      const size = settingsManager.getChipSize();
-      assert.strictEqual(size, 'large');
-    });
-
-    test('should fallback to medium for invalid size', () => {
-      mockConfiguration({ chipSize: 'invalid' });
-
-      const size = settingsManager.getChipSize();
-      assert.strictEqual(size, 'medium');
-    });
-  });
 
   suite('Boolean Settings', () => {
     test('should return default enabled state', () => {
@@ -246,7 +225,6 @@ suite('SettingsManager Tests', () => {
       mockConfiguration({
         displayMode: 'multiple',
         variableResolutionScope: 'file',
-        chipSize: 'large',
         maxColorsInMultipleMode: 3,
         cacheSizeLimit: 50,
         debounceDelay: 500
@@ -281,14 +259,12 @@ suite('SettingsManager Tests', () => {
     test('should get all settings', () => {
       mockConfiguration({
         enabled: true,
-        displayMode: 'multiple',
-        chipSize: 'large'
+        displayMode: 'multiple'
       });
 
       const allSettings = settingsManager.getAllSettings();
       assert.strictEqual(allSettings.enabled, true);
       assert.strictEqual(allSettings.displayMode, 'multiple');
-      assert.strictEqual(allSettings.chipSize, 'large');
     });
 
     test('should handle settings change callbacks', () => {

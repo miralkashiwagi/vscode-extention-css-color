@@ -305,7 +305,6 @@ class MockSettingsManager implements SettingsManager {
   displayMode: DisplayMode = 'default';
   enabledFileTypes: string[] = ['css', 'scss'];
   variableResolutionScope: 'file' | 'workspace' = 'workspace';
-  chipSize: 'small' | 'medium' | 'large' = 'medium';
   enabled: boolean = true;
   _showVariableDefinitions: boolean = true;
   _showVariableUsages: boolean = true;
@@ -320,7 +319,6 @@ class MockSettingsManager implements SettingsManager {
   getDisplayMode() { return this.displayMode; }
   getEnabledFileTypes() { return this.enabledFileTypes; }
   getVariableResolutionScope() { return this.variableResolutionScope; }
-  getChipSize() { return this.chipSize; }
   isEnabled() { return this.enabled; }
   showVariableDefinitions() { return this._showVariableDefinitions; }
   showVariableUsages() { return this._showVariableUsages; }

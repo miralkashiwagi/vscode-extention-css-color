@@ -424,7 +424,6 @@ export class DebugInfoCollector {
       displayMode: config.get('displayMode'),
       enabledFileTypes: config.get('enabledFileTypes'),
       variableResolutionScope: config.get('variableResolutionScope'),
-      chipSize: config.get('chipSize'),
       showVariableDefinitions: config.get('showVariableDefinitions'),
       showVariableUsages: config.get('showVariableUsages'),
       enableHoverInfo: config.get('enableHoverInfo'),

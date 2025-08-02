@@ -6,7 +6,6 @@ import {
   ParseResult, 
   ColorMatch,
   DisplayMode,
-  ChipSize,
   ResolutionScope
 } from './types';
 
@@ -53,7 +52,6 @@ export interface SettingsManager {
   getDisplayMode(): DisplayMode;
   getEnabledFileTypes(): string[];
   getVariableResolutionScope(): ResolutionScope;
-  getChipSize(): ChipSize;
   isEnabled(): boolean;
   showVariableDefinitions(): boolean;
   showVariableUsages(): boolean;

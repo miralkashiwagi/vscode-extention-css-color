@@ -36,6 +36,11 @@ export class ColorValueImpl implements ColorValue {
       return;
     }
 
+    // Check for invalid RGB/RGBA values before using tinycolor2
+    if (this.hasInvalidRgbValues(colorString)) {
+      return;
+    }
+
     // Use tinycolor2 to parse and validate the color
     const color = tinycolor(colorString);
     
@@ -161,6 +166,39 @@ export class ColorValueImpl implements ColorValue {
     ];
 
     return transformFunctions.some(func => value.includes(func + '('));
+  }
+
+  private hasInvalidRgbValues(value: string): boolean {
+    // Check for rgb() or rgba() functions with invalid values
+    const rgbRegex = /rgba?\(\s*([^,\s]+)\s*,\s*([^,\s]+)\s*,\s*([^,\s]+)(?:\s*,\s*([^,\s)]+))?\s*\)/i;
+    const match = value.match(rgbRegex);
+    
+    if (match) {
+      const [, r, g, b, a] = match;
+      
+      // Check if RGB values are numbers and within valid range (0-255)
+      const rNum = parseFloat(r);
+      const gNum = parseFloat(g);
+      const bNum = parseFloat(b);
+      
+      if (isNaN(rNum) || isNaN(gNum) || isNaN(bNum)) {
+        return true; // Invalid if not numbers
+      }
+      
+      if (rNum < 0 || rNum > 255 || gNum < 0 || gNum > 255 || bNum < 0 || bNum > 255) {
+        return true; // Invalid if out of range
+      }
+      
+      // Check alpha value if present (should be 0-1)
+      if (a !== undefined) {
+        const aNum = parseFloat(a);
+        if (isNaN(aNum) || aNum < 0 || aNum > 1) {
+          return true; // Invalid alpha
+        }
+      }
+    }
+    
+    return false;
   }
 
   // Static factory method for creating ColorValue instances
